@@ -42,13 +42,22 @@ the DIGI R1A Android TV box wakes from standby.
 
 Build tool versions are provisional until a successful build is recorded.
 
+## Continuous integration
+
+GitHub Actions is configured to run Android CI on relevant pushes and pull
+requests. Once the Gradle Wrapper and Android project are present, the workflow
+will run unit tests, build the debug APK and upload it as a workflow artifact.
+
+See [CI/CD documentation](docs/CI-CD.md). The workflow is not yet evidence of
+a successful Android build: the application project has not been created.
+
 ## Current status
 
 - [x] Public GitHub repository created.
 - [x] MIT license selected.
 - [x] Local Git repository initialized.
-- [x] Android SDK installed.
-- [ ] Initial documentation committed.
+- [x] Initial documentation committed and published.
+- [x] GitHub Actions Android CI workflow configured.
 - [ ] Native Android project created.
 - [ ] First APK built.
 - [ ] APK installation tested on DIGI R1A.
@@ -60,4 +69,5 @@ Build tool versions are provisional until a successful build is recorded.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Technical decisions](docs/DECISIONS.md)
 - [Test plan](docs/TEST-PLAN.md)
+- [CI/CD](docs/CI-CD.md)
 - [Changelog](CHANGELOG.md)
