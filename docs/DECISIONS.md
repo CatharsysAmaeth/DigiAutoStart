@@ -71,3 +71,20 @@ Determine which wake events and background activity launches are possible
 for a normal sideloaded application on the actual DIGI R1A firmware.
 Do not assume that a boot receiver or background service can bypass
 platform restrictions.
+
+## D-009: GitHub-hosted CI
+
+Status: Accepted
+
+Use GitHub Actions with GitHub-hosted Linux runners for repeatable Android
+builds and unit tests.
+
+Consequences:
+- Use JDK 21 and the Android SDK on the runner.
+- Build through the committed Gradle Wrapper.
+- Upload successful debug APKs as short-lived workflow artifacts.
+- Do not commit signing keys or credentials.
+- Defer production APK signing and tag-based releases until the application
+  ID and secure signing-key handling have been decided.
+- Physical standby/wake and DRM validation remain device tests; cloud CI
+  cannot establish those properties.
