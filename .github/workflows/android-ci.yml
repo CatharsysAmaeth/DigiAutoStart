@@ -4,26 +4,19 @@ on:
   push:
     branches:
       - main
+      - "feature/**"
     paths:
       - "app/**"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
+      - "*.gradle.kts"
       - "gradle.properties"
-      - "**/*.gradle"
-      - "**/*.gradle.kts"
       - ".github/workflows/android-ci.yml"
   pull_request:
     branches:
       - main
     paths:
       - "app/**"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
+      - "*.gradle.kts"
       - "gradle.properties"
-      - "**/*.gradle"
-      - "**/*.gradle.kts"
       - ".github/workflows/android-ci.yml"
   workflow_dispatch:
 
@@ -38,52 +31,34 @@ jobs:
   build:
     name: Build and test Android app
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Check for Gradle Wrapper
-        id: gradle
-        shell: bash
-        run: |
-          if [[ -x ./gradlew ]]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice title=Build skipped::The Gradle Wrapper has not been added yet. CI is ready and will build once the Android project is committed."
-          fi
-
-      - name: Validate Gradle Wrapper
-        if: steps.gradle.outputs.available == 'true'
-        uses: gradle/actions/wrapper-validation@v6
-
       - name: Set up JDK 21
-        if: steps.gradle.outputs.available == 'true'
         uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK
-        if: steps.gradle.outputs.available == 'true'
         uses: android-actions/setup-android@v4
 
       - name: Install Android SDK packages
-        if: steps.gradle.outputs.available == 'true'
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle and dependency cache
-        if: steps.gradle.outputs.available == 'true'
+      - name: Set up Gradle 8.13 and dependency cache
         uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.13"
 
       - name: Run unit tests and build debug APK
-        if: steps.gradle.outputs.available == 'true'
-        run: ./gradlew --no-daemon --stacktrace testDebugUnitTest assembleDebug
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
 
       - name: Upload debug APK
-        if: success() && steps.gradle.outputs.available == 'true'
+        if: success()
         uses: actions/upload-artifact@v7
         with:
           name: DigiAutoStart-debug-${{ github.sha }}
