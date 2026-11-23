@@ -1,17 +1,21 @@
 # DigiAutoStart
 
-Native Android application for automatically reopening DIGI TV after
-the DIGI R1A Android TV box wakes from standby.
+Native Android application for testing DIGI TV launch behavior on the DIGI R1A
+Android TV box and, after device validation, automating reopening after standby.
 
-## Objectives
+## Current test build
 
-- Provide two launch modes:
-  - Always launch DIGI TV after wake.
-  - Launch DIGI TV only if it was the last app before standby.
-- Allow configuration of launch delay and cooldown.
-- Provide manual launch testing and diagnostic logs.
-- Offer a TV remote-friendly interface.
-- Preserve the original Android TV / Google TV launcher.
+Version: **0.1.0 (debug)**
+
+This first APK is a device-installation and manual-launch test build. It provides:
+- TV-friendly interface navigable with a remote.
+- Mode A / Mode B preference selection (saved locally, not yet automated).
+- Configurable intended launch delay (saved locally, not yet applied).
+- Detection of whether the DIGI TV launch activity is available.
+- Manual DIGI TV launch test.
+
+**Standby detection and automatic launching are not implemented in this build.**
+Do not interpret the stored mode/delay preferences as active automation.
 
 ## Target device
 
@@ -31,38 +35,38 @@ the DIGI R1A Android TV box wakes from standby.
 - No modifications to protected system partitions.
 - Do not replace the original launcher.
 
-## Development environment
+## Android project
 
-- macOS on Apple Silicon
-- JDK 21
-- Android SDK Platform 36
-- Android Build Tools 36.0.0
-- Proposed Android Gradle Plugin: 9.4.0
-- Proposed Gradle Wrapper: 9.6.0
+- Language: Kotlin
+- Application ID: `pt.catharsys.digiautostart` (initial project ID)
+- minSdk: 31
+- compileSdk: 36
+- targetSdk: 35
+- Android Gradle Plugin: 8.13.2
+- Gradle: 8.13
+- Kotlin Gradle Plugin: 2.2.21
+- CI runtime: Temurin JDK 21
 
-Build tool versions are provisional until a successful build is recorded.
+The first successful runner build will establish whether this toolchain is valid.
 
 ## Continuous integration
 
-GitHub Actions is configured to run Android CI on relevant pushes and pull
-requests. Once the Gradle Wrapper and Android project are present, the workflow
-will run unit tests, build the debug APK and upload it as a workflow artifact.
+GitHub Actions builds and tests the Android project on GitHub-hosted Ubuntu
+runners. A successful build uploads the debug APK as a 14-day workflow artifact.
 
-See [CI/CD documentation](docs/CI-CD.md). The workflow is not yet evidence of
-a successful Android build: the application project has not been created.
+See [CI/CD documentation](docs/CI-CD.md).
 
 ## Current status
 
-- [x] Public GitHub repository created.
-- [x] MIT license selected.
-- [x] Local Git repository initialized.
-- [x] Initial documentation committed and published.
-- [x] GitHub Actions Android CI workflow configured.
-- [ ] Native Android project created.
-- [ ] First APK built.
+- [x] Public GitHub repository and MIT license.
+- [x] GitHub Actions Android CI.
+- [x] Initial native Kotlin Android project.
+- [x] TV-friendly first test interface and manual launch action.
+- [x] Unit tests for launch-mode decision logic.
+- [ ] First successful remote APK build.
 - [ ] APK installation tested on DIGI R1A.
-- [ ] Standby / wake detection tested.
-- [ ] Automatic launch behavior validated.
+- [ ] Standby / wake detection investigated on device.
+- [ ] Automatic launch behavior implemented and validated.
 
 ## Documentation
 
