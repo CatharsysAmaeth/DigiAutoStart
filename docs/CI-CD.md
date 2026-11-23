@@ -2,66 +2,62 @@
 
 ## Goals
 
-Use GitHub-hosted runners to validate and build the Android application without
-requiring the developer Mac to perform CI builds.
+Build and test Android code on GitHub-hosted runners without requiring the
+developer Mac to compile the application.
 
 ## Android CI workflow
 
 Workflow: `.github/workflows/android-ci.yml`
 
 Triggers:
-- Pushes to `main` that change Android/Gradle project files or the workflow.
-- Pull requests targeting `main` with those changes.
-- Manual execution through GitHub Actions (`workflow_dispatch`).
+- Relevant pushes to `main` and `feature/**`.
+- Pull requests targeting `main`.
+- Manual execution through `workflow_dispatch`.
 
 Runner:
 - GitHub-hosted `ubuntu-latest`.
 - Temurin JDK 21.
-- Android SDK command-line tools, platform-tools, Android Platform 36
-  and Build Tools 36.0.0.
+- Android SDK Platform 36 and Build Tools 36.0.0.
+- Gradle 8.13 installed by Gradle Actions.
 
-When the Gradle Wrapper is present, the workflow:
-1. Validates the Gradle Wrapper.
-2. Sets up Java and the Android SDK.
-3. Configures Gradle caching.
-4. Runs `testDebugUnitTest` and `assembleDebug`.
-5. Uploads the debug APK as a workflow artifact when the build succeeds.
+The workflow runs:
+1. Android SDK setup.
+2. Gradle dependency caching.
+3. `testDebugUnitTest`.
+4. `assembleDebug`.
+5. Uploads the debug APK as a 14-day workflow artifact.
 
-Until `gradlew` exists, the workflow reports a notice and skips the build.
-This allows the CI configuration to be introduced before the Android project.
+A successful CI build proves that the APK compiles and unit tests pass. It
+does not prove compatibility with the DIGI R1A firmware.
 
-## Artifact policy
+## APK artifact
 
-Debug APKs are CI artifacts, not production releases. They are intended for
-installation tests on the DIGI R1A and expire according to the workflow's
-artifact retention setting.
+The debug APK is intended for installation tests. It is unsigned with a
+production key (Gradle debug builds use the standard debug signing config).
+It is not a production release.
 
-## Production releases and signing
+## Production signing and releases
 
-Production APK signing is deliberately not configured yet.
+Production signing is deliberately deferred.
 
 Before enabling signed releases:
-- Decide and record the Android application ID.
-- Generate the production signing key in a trusted local environment.
+- Confirm the permanent Android application ID.
+- Generate the production signing key in a trusted environment.
 - Keep the keystore and passwords out of Git.
-- Store signing material only in appropriately protected GitHub Secrets
-  or a protected GitHub Environment.
-- Define a recovery backup for the signing key.
-- Add a tag-triggered release workflow only after the signing process is tested.
+- Store signing material only in protected GitHub Secrets / Environment.
+- Maintain a secure offline backup of the signing key.
+- Add a tag-triggered release workflow only after signing is tested.
 
-Never commit a keystore, private signing key, password, token or credential.
+Never commit a keystore, private key, password, token or credential.
 
 ## Device testing boundary
 
 GitHub-hosted runners cannot validate standby/wake behavior or DRM state on
-the physical DIGI R1A. Those checks remain manual device acceptance tests.
-Widevine L1 and Google/Android TV certification must not be put at risk.
+the physical DIGI R1A. Those checks remain device acceptance tests.
+Widevine L1 and Google / Android TV certification must not be put at risk.
 
-## Security and maintenance
+## Security
 
-- Workflows use read-only repository permissions unless a future publishing
-  workflow has a documented need for additional permissions.
-- Third-party actions use maintained major-version tags and should be reviewed
-  periodically for security updates.
+- Workflows use read-only repository permissions.
 - Do not expose secrets to pull-request code from untrusted forks.
 - Keep build logs and artifacts free of credentials and personal data.
