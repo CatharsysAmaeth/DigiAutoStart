@@ -41,27 +41,23 @@ DIGI TV package observed on the device: `ro.digionline.tv`.
 
 Resolve the launch activity dynamically instead of assuming an activity name.
 
-## D-006: Build environment
+## D-006: Android build toolchain
 
-Status: Proposed
+Status: Proposed — validate with first successful clean CI build
 
-- JDK 21
-- Android SDK Platform 36
-- Build Tools 36.0.0
-- Android Gradle Plugin 9.4.0
-- Gradle 9.6.0
-- AGP built-in Kotlin support
-
-Validate versions with the first clean build before treating this toolchain
-as established.
+- JDK 21 on GitHub runner.
+- Android SDK Platform 36 / Build Tools 36.0.0.
+- Android Gradle Plugin 8.13.2.
+- Gradle 8.13.
+- Kotlin Gradle Plugin 2.2.21.
+- minSdk 31, targetSdk 35.
 
 ## D-007: Permissions
 
 Status: Open
 
-Investigate Usage Access and battery optimization settings.
-Do not request overlay, accessibility or other permissions without
-a demonstrated technical need.
+Do not request overlay, accessibility, Usage Access or other permissions
+without a demonstrated technical need.
 
 ## D-008: Android background launch restrictions
 
@@ -77,14 +73,22 @@ platform restrictions.
 Status: Accepted
 
 Use GitHub Actions with GitHub-hosted Linux runners for repeatable Android
-builds and unit tests.
+builds and unit tests. Upload debug APK artifacts for device testing. Keep
+production signing material out of Git and defer production releases until
+application identity and secure key management are established.
 
-Consequences:
-- Use JDK 21 and the Android SDK on the runner.
-- Build through the committed Gradle Wrapper.
-- Upload successful debug APKs as short-lived workflow artifacts.
-- Do not commit signing keys or credentials.
-- Defer production APK signing and tag-based releases until the application
-  ID and secure signing-key handling have been decided.
-- Physical standby/wake and DRM validation remain device tests; cloud CI
-  cannot establish those properties.
+## D-010: Initial application identity
+
+Status: Provisional
+
+Initial application ID: `pt.catharsys.digiautostart`.
+
+Changing the application ID after installation means Android treats the app
+as a different application. Confirm this identity before a production release.
+
+## D-011: First device-test APK scope
+
+Status: Accepted
+
+Version 0.1.0 validates installation, TV navigation, saved preferences and
+manual DIGI TV launch. It does not claim standby detection or automatic launch.
