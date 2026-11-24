@@ -176,7 +176,7 @@ class AutomationService : Service() {
                 packageName == homePackage || packageName == "com.android.systemui") continue
             lastUserPackage = packageName
         }
-        return lastUserPackage == TARGET_PACKAGE
+        return lastUserPackage == (TargetAppResolver.selectedPackage(this) ?: TargetAppResolver.DEFAULT_PACKAGE)
     }
 
     private fun handleScreenOn() {
@@ -195,7 +195,7 @@ class AutomationService : Service() {
             DiagnosticsFeature.record(this, "automation_launch_blocked", "reason=overlay_permission_missing,trigger=$reason")
             return
         }
-        val launchIntent = packageManager.getLaunchIntentForPackage(TARGET_PACKAGE)
+        val targetPackage = TargetAppResolver.selectedPackage(this) ?: TargetAppResolver.DEFAULT_PACKAGE\n        val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
         if (launchIntent == null) {
             DiagnosticsFeature.record(this, "automation_launch_failed", "reason=no_launch_intent,trigger=$reason")
             return
@@ -222,7 +222,7 @@ class AutomationService : Service() {
             events.getNextEvent(event)
             if ((event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                     event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) &&
-                event.packageName == TARGET_PACKAGE && event.timeStamp >= launchRequestedAt) {
+                event.packageName == (TargetAppResolver.selectedPackage(this) ?: TargetAppResolver.DEFAULT_PACKAGE) && event.timeStamp >= launchRequestedAt) {
                 targetResumed = true
             }
         }
