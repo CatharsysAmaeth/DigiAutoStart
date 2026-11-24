@@ -16,6 +16,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -32,8 +36,6 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
-
-    // Diagnostics and encrypted export exist only in the Debug variant.
     debugImplementation("androidx.core:core:1.17.0")
     debugImplementation("net.lingala.zip4j:zip4j:2.11.5")
 }
