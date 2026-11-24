@@ -27,3 +27,11 @@
 ## 0.1.0 — initial device-test build
 
 - Added TV-friendly interface, preferences and manual DIGI TV launch.
+
+
+## 0.5.2 — in progress
+
+- Add optional DIGI TV launch at box startup, disabled by default and independent of Mode B.
+- Keep the foreground monitor restart at boot whenever automation is enabled.
+- Verify whether DIGI TV actually becomes foreground after automated launch attempts; record observed/not-observed outcomes.
+- Keep visible app version and DEBUG marker.
