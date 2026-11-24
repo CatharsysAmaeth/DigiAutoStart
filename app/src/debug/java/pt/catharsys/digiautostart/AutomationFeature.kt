@@ -24,7 +24,7 @@ object AutomationFeature {
     private const val KEY_ENABLED = "automation_enabled"
     private const val KEY_LAUNCH_ON_BOOT = "launch_digi_on_boot"
 
-    fun configure(activity: Activity) {
+    fun configure(activity: Activity, onSaved: () -> Unit = {}) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val target = TargetAppResolver.selectedPackage(activity)
         val root = LinearLayout(activity).apply {
@@ -158,6 +158,7 @@ object AutomationFeature {
                 }
                 Toast.makeText(activity, "Configuração do DAdA guardada.", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
+                onSaved()
             }
         }
         dialog.show()
