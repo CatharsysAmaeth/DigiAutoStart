@@ -41,7 +41,7 @@ jobs:
 
       - name: Rename APKs
         run: |
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "DigiAutoStart-${GITHUB_REF_NAME}-normal-unsigned.apk"
+          cp app/build/outputs/apk/release/app-release.apk "DigiAutoStart-${GITHUB_REF_NAME}-normal.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "DigiAutoStart-${GITHUB_REF_NAME}-debug.apk"
 
       - name: Publish GitHub Release
