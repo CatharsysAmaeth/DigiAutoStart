@@ -24,7 +24,7 @@ The workflow:
 2. Builds Debug and normal Release APKs.
 3. Checks that Release contains the standby/startup automation and required permissions.
 4. Checks that Release excludes private diagnostics, the test updater and Debug-only network/package-install permissions.
-5. Publishes the normal APK only from `main`; pull requests do not publish it.
+5. Creates or updates a versioned GitHub Release with the stable APK only from `main`; pull requests do not publish it.
 
 A successful CI build proves that compilation, unit tests and APK-content checks passed. It does not replace physical-device validation of standby/wake behavior.
 
