@@ -40,19 +40,30 @@ class AutomationService : Service() {
             return START_NOT_STICKY
         }
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (!prefs.getBoolean(KEY_ENABLED, false)) {
+        val automationEnabled = prefs.getBoolean(KEY_ENABLED, false)
+        val bootLaunchRequested = intent?.action == ACTION_BOOT_COMPLETED &&
+            prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
+        if (!automationEnabled && !bootLaunchRequested) {
             stopSelf()
             return START_NOT_STICKY
         }
         startAsForeground()
-        registerScreenReceiver()
-        DiagnosticsFeature.record(this, "automation_service_started")
-        if (intent?.action == ACTION_BOOT_COMPLETED &&
-            prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)) {
+        if (automationEnabled) registerScreenReceiver()
+        DiagnosticsFeature.record(this, "automation_service_started",
+            "monitor_enabled=$automationEnabled,boot_launch=$bootLaunchRequested")
+        if (bootLaunchRequested) {
             DiagnosticsFeature.record(this, "automation_boot_launch_scheduled", "delay_seconds=$BOOT_LAUNCH_DELAY_SECONDS")
-            handler.postDelayed({ launchTarget("boot") }, BOOT_LAUNCH_DELAY_SECONDS * 1000L)
+            handler.postDelayed({
+                launchTarget("boot")
+                if (!automationEnabled) {
+                    handler.postDelayed({
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }, VERIFY_LAUNCH_DELAY_MS + 1000L)
+                }
+            }, BOOT_LAUNCH_DELAY_SECONDS * 1000L)
         }
-        return START_STICKY
+        return if (automationEnabled) START_STICKY else START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
