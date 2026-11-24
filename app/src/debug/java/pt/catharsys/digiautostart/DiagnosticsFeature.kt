@@ -59,7 +59,7 @@ object DiagnosticsFeature {
         }
         receiver = instance
         if (Build.VERSION.SDK_INT >= 33) {
-            context.applicationContext.registerReceiver(instance, filter, Context.RECEIVER_NOT_EXPORTED)
+            context.applicationContext.registerReceiver(instance, filter, Context.RECEIVER_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
             context.applicationContext.registerReceiver(instance, filter)
