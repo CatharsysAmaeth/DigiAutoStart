@@ -11,8 +11,8 @@ android {
         applicationId = "pt.catharsys.digiautostart"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0-debug-diagnostics"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -32,4 +32,8 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+
+    // Diagnostics and encrypted export exist only in the Debug variant.
+    debugImplementation("androidx.core:core:1.17.0")
+    debugImplementation("net.lingala.zip4j:zip4j:2.11.5")
 }

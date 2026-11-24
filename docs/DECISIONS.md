@@ -65,17 +65,13 @@ Status: Open
 
 Determine which wake events and background activity launches are possible
 for a normal sideloaded application on the actual DIGI R1A firmware.
-Do not assume that a boot receiver or background service can bypass
-platform restrictions.
 
 ## D-009: GitHub-hosted CI
 
 Status: Accepted
 
 Use GitHub Actions with GitHub-hosted Linux runners for repeatable Android
-builds and unit tests. Upload debug APK artifacts for device testing. Keep
-production signing material out of Git and defer production releases until
-application identity and secure key management are established.
+builds and unit tests. Upload debug APK artifacts for device testing.
 
 ## D-010: Initial application identity
 
@@ -83,12 +79,20 @@ Status: Provisional
 
 Initial application ID: `pt.catharsys.digiautostart`.
 
-Changing the application ID after installation means Android treats the app
-as a different application. Confirm this identity before a production release.
-
 ## D-011: First device-test APK scope
 
 Status: Accepted
 
 Version 0.1.0 validates installation, TV navigation, saved preferences and
 manual DIGI TV launch. It does not claim standby detection or automatic launch.
+
+## D-012: Debug-only diagnostics
+
+Status: Accepted
+
+Diagnostics are compiled only in the Debug source set. Release contains a
+no-op API shim, no diagnostics screen/receiver and no ZIP encryption
+dependency. Capture is opt-in, local, bounded and user-exported. Reports use
+AES-256 encrypted ZIP; the password is entered by the user at export time and
+is not committed to the public repository. Automatic GitHub upload is deferred
+until a private destination and limited credential can be configured safely.
