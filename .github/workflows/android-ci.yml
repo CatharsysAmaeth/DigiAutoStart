@@ -235,10 +235,10 @@ jobs:
               gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE" --input -
           fi
 
-          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\\1/p' app/build.gradle.kts | head -n1)"
-          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\\1/p' app/build.gradle.kts | head -n1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
+          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
           APK_SHA256="$(sha256sum app/build/outputs/apk/release/app-release.apk | awk '{print $1}')"
-          jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \\
+          jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
             '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-release.apk",buildType:"release",debugMenu:false}' > /tmp/release-version.json
           base64 -w 0 /tmp/release-version.json > /tmp/release-version.base64
           VERSION_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/release-version.json?ref=main" --jq '.sha' 2>/dev/null || true)"
