@@ -119,7 +119,7 @@ class MainActivity : Activity() {
             setTextColor(0xFFFFFFFF.toInt())
         }, margin(bottom = 8))
         content.addView(text(
-            "Esta versão permite testar a instalação, a interface, as preferências e a abertura manual da DIGI TV. A deteção de standby/retoma e o arranque automático ainda não estão ativos. As opções de modo e atraso ficam guardadas para a fase seguinte.",
+            "Esta versão inclui um protótipo experimental de deteção de standby/retoma e tentativa de abertura automática da DIGI TV. Requer configuração explícita das permissões no botão «Configurar automação (teste)» e ainda precisa de validação nesta box. O recetor deixa de funcionar se o Android terminar o processo da aplicação.",
             16f
         ).apply { setTextColor(0xFFD2DCE2.toInt()) }, margin(bottom = 14))
 
