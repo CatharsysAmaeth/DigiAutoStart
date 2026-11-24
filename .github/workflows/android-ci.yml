@@ -121,12 +121,12 @@ jobs:
             exit 0
           fi
           FILE="apk/DigiAutoStart-debug.apk"
-          CONTENT="$(base64 -w 0 app/build/outputs/apk/debug/app-debug.apk)"
+          base64 -w 0 app/build/outputs/apk/debug/app-debug.apk > /tmp/debug-apk.base64
           EXISTING_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE?ref=main" --jq '.sha' 2>/dev/null || true)"
           if [ -n "$EXISTING_SHA" ]; then
-            jq -n --arg message "build: publish Debug APK" --arg content "$CONTENT" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
+            jq --rawfile content /tmp/debug-apk.base64 -n --arg message "build: publish Debug APK" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
               gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE" --input -
           else
-            jq -n --arg message "build: publish Debug APK" --arg content "$CONTENT" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
+            jq --rawfile content /tmp/debug-apk.base64 -n --arg message "build: publish Debug APK" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
               gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE" --input -
           fi
