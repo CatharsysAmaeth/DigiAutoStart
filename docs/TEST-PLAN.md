@@ -1,52 +1,52 @@
-# DIGI R1A test plan
+# DAdA 0.6.0 acceptance test plan
 
-## Test environment
+## T1 — Installation and upgrade
 
-Record before testing:
-- Device model and firmware build.
-- Android version and security patch.
-- DIGI TV version.
-- Installation method.
-- App permissions and special access granted.
+- Install the normal Release APK.
+- Confirm DAdA appears in the Android TV app list with the correct icon and banner.
+- Confirm an existing signed installation can be updated without uninstalling it.
+- Confirm saved preferences remain available after the update.
+- Confirm the original launcher and DIGI TV remain functional.
+- Confirm Widevine L1 and platform certification remain intact.
 
-Do not publish device identifiers, credentials or private network details.
+## T2 — Configuration and permissions
 
-## Test stages
+- Open the “Configurar” screen using TV remote navigation.
+- Confirm Mode A and Mode B can be selected and saved.
+- Confirm the wake delay can be set from 0 to 30 seconds.
+- Confirm launch-at-startup can be enabled independently.
+- Confirm the app explains and requests only the required special permissions.
+- Confirm Mode B requires Usage Access and both automation modes require Display over other apps access.
 
-### T1 - Installation
-- Install the standalone APK.
-- Confirm DigiAutoStart appears in the app list.
-- Confirm DIGI TV and the original launcher remain functional.
-- Check that Widevine L1 and device certification remain intact.
+## T3 — Standby and wake
 
-### T2 - Manual launch
-- Launch DIGI TV using the app's manual test.
-- Test with DIGI TV installed and available.
-- Test graceful handling if the package cannot be resolved.
+- Test Mode A across repeated standby/wake cycles.
+- Test Mode B with DIGI TV as the last foreground app.
+- Test Mode B with another app or the launcher as the last foreground app.
+- Confirm the configured delay is respected.
+- Confirm the disabled state does not reopen the TV app.
 
-### T3 - Foreground tracking
-- Evaluate Usage Access.
-- Open DIGI TV, another app and the launcher.
-- Check whether the app can reliably identify the last foreground app.
+## T4 — Startup and recovery
 
-### T4 - Standby and wake
-- Test short and long standby periods.
-- Record which events are observed.
-- Distinguish a real wake event from process restart or boot.
+- Test startup launch when enabled.
+- Confirm startup launch remains disabled by default.
+- Confirm enabled standby monitoring is restored after a device restart.
+- Confirm enabled monitoring is restored after an application update.
+- Confirm startup launch remains independent of Mode A/B.
 
-### T5 - Automation modes
-- Test Mode A.
-- Test Mode B.
-- Test configurable delay and cooldown.
-- Test disabled state.
+## T5 — Target resolution
 
-### T6 - Reliability
-- Repeat tests across multiple standby cycles.
-- Record successes, failures and timing.
-- Check behavior after reboot.
-- Check whether Android terminates or restricts the app.
+- Confirm the official DIGI TV app is selected by default when available.
+- Test conservative discovery of compatible Android TV alternatives.
+- Confirm ambiguous candidates require manual selection.
+- Confirm the selected target is used consistently for standby and startup.
+
+## T6 — Release isolation and privacy
+
+- Confirm the normal Release has no Debug menu, diagnostic collection or private test updater.
+- Confirm Release does not request Debug-only internet or package-install permissions.
+- Confirm no device identifiers, credentials, signing material or private network details are included in public documentation.
 
 ## Evidence rules
 
-Only mark a test as passed when supported by observed device results.
-Separate confirmed behavior, failed tests and unverified hypotheses.
+Mark a test as passed only when supported by observed device results. Distinguish confirmed behavior from failed tests and unverified assumptions. Do not publish device identifiers, diagnostic reports or private network details.
