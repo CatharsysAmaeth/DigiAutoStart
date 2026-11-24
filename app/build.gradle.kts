@@ -3,6 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val diagnosticsTokenB64 = System.getenv("DIAGNOSTICS_REPO_TOKEN_B64").orEmpty()
+val diagnosticsPasswordB64 = System.getenv("DIAGNOSTICS_ZIP_PASSWORD_B64").orEmpty()
+val stableDebugStorePath = System.getenv("DIGIAUTOSTART_SIGNING_STORE_FILE").orEmpty()
+val stableDebugStorePassword = System.getenv("DIGIAUTOSTART_SIGNING_STORE_PASSWORD").orEmpty()
+
 android {
     namespace = "pt.catharsys.digiautostart"
     compileSdk = 36
@@ -11,14 +16,30 @@ android {
         applicationId = "pt.catharsys.digiautostart"
         minSdk = 31
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // The Release APK uses the standard local debug key for sideload testing.
-    // This is not a production-distribution signing identity.
+    signingConfigs {
+        if (stableDebugStorePath.isNotBlank()) {
+            create("stableDebug") {
+                storeFile = file(stableDebugStorePath)
+                storePassword = stableDebugStorePassword
+                keyAlias = "digiautostart"
+                keyPassword = stableDebugStorePassword
+            }
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            if (stableDebugStorePath.isNotBlank()) {
+                signingConfig = signingConfigs.getByName("stableDebug")
+            }
+            buildConfigField("String", "DIAGNOSTICS_GITHUB_TOKEN_B64", "\"$diagnosticsTokenB64\"")
+            buildConfigField("String", "DIAGNOSTICS_ZIP_PASSWORD_B64", "\"$diagnosticsPasswordB64\"")
+        }
         getByName("release") {
             signingConfig = signingConfigs.getByName("debug")
         }
