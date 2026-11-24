@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         DiagnosticsFeature.attach(applicationContext)
+        AutomationFeature.attach(applicationContext)
         DiagnosticsFeature.record(this, "activity_started")
     }
 
@@ -109,6 +110,7 @@ class MainActivity : Activity() {
         content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 20))
 
         if (BuildConfig.DEBUG) {
+            content.addView(button("Configurar automação (teste)") { AutomationFeature.configure(this) }, margin(bottom = 12))
             content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
             content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
         }
