@@ -1,10 +1,15 @@
-# APK publishing
+# Publicação de APKs
 
-The `android-ci` workflow builds and tests both variants on pushes to `main`.
+O workflow de Android compila e testa as variantes Debug e Release.
 
-- The Release APK is committed to `apk/DigiAutoStart-normal.apk` in this public repository.
-- The Debug APK is uploaded to `apk/DigiAutoStart-debug.apk` in the private `DigiAutoStart-Diagnostics` repository.
-- The private upload uses the `DIAGNOSTICS_REPO_TOKEN` Actions secret. It must be a fine-grained token scoped to the private diagnostics repository with Contents read/write permission.
-- Pull requests build and test the APKs but do not publish them.
+- O APK estável é publicado como ficheiro anexo a uma GitHub Release, depois de as alterações serem integradas na branch `main`.
+- Cada versão usa uma etiqueta própria, no formato `vX.Y.Z`, e o nome do APK inclui a versão.
+- Os APKs binários não são guardados na árvore de código do repositório público.
+- A versão Release inclui o ecrã de configuração e a automação de standby/arranque testada.
+- A versão Release exclui menus de desenvolvimento, recolha de diagnósticos, ferramentas privadas de teste e permissões de rede/instalação exclusivas de Debug.
+- As compilações Debug destinam-se ao desenvolvimento e a testes no equipamento; não são publicadas como versões estáveis.
+- Os pedidos de integração compilam e testam ambas as variantes, mas não publicam uma versão.
 
-The Release APK is checked to ensure that diagnostics code, Zip4j, and the Debug-only internet permission are absent.
+O workflow verifica o manifesto e os ficheiros DEX da Release: a automação tem de estar presente e os diagnósticos privados e ferramentas de Debug têm de estar ausentes.
+
+O material de assinatura e as credenciais são mantidos fora do código público, em configuração protegida do CI. Nunca incluir num commit um keystore, chave privada, palavra-passe, token ou credencial.

@@ -3,11 +3,18 @@
 
     <queries>
         <package android:name="ro.digionline.tv" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
     </queries>
 
     <application
         android:allowBackup="false"
-        android:label="DigiAutoStart"
+        android:icon="@mipmap/ic_launcher_legacy"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="DAdA"
+        android:banner="@drawable/dada_tv_banner"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 

@@ -8,93 +8,165 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Process
 import android.provider.Settings
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
+import android.widget.SeekBar
+import android.widget.Switch
+import android.widget.TextView
 import android.widget.Toast
 
-/** Debug-only setup UI for the foreground automation service. */
+/** Debug-only configuration screen for all startup and standby options. */
 object AutomationFeature {
     private const val PREFS = "digi_autostart"
+    private const val KEY_ENABLED = "automation_enabled"
     private const val KEY_LAUNCH_ON_BOOT = "launch_digi_on_boot"
 
-    fun configure(activity: Activity) {
+    fun configure(activity: Activity, onSaved: () -> Unit = {}) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val enabled = prefs.getBoolean("automation_enabled", false)
-        val mode = prefs.getInt("mode", 2)
-        val overlay = Settings.canDrawOverlays(activity)
-        val usage = hasUsageAccess(activity)
-        val launchOnBoot = prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
-        val message = buildString {
-            append("Automação: ").append(if (enabled) "ATIVA" else "desativada")
-            append("\nModo: ").append(if (mode == 1) "A — abrir sempre" else "B — apenas se DIGI TV era a última aplicação")
-            append("\nAbrir DIGI TV ao iniciar a box: ").append(if (launchOnBoot) "SIM" else "não")
-            append("\nMostrar sobre outras aplicações: ").append(if (overlay) "autorizado" else "por autorizar")
-            if (mode != 1) append("\nAcesso às estatísticas: ").append(if (usage) "autorizado" else "por autorizar")
-            append("\n\nO serviço de monitorização arranca com a box quando a automação está ativa. A opção de abrir a DIGI TV no arranque é independente e está desligada por defeito.")
-            append("\n\nO serviço mantém uma notificação discreta e monitoriza a saída do standby.")
+        val target = TargetAppResolver.selectedPackage(activity)
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(activity, 20), dp(activity, 8), dp(activity, 20), dp(activity, 8))
         }
-        val actions = mutableListOf<String>()
-        actions += if (launchOnBoot) "Desativar abertura da DIGI TV no arranque" else "Ativar abertura da DIGI TV no arranque"
-        if (!overlay) actions += "Autorizar «Mostrar sobre outras aplicações»"
-        if (mode != 1 && !usage) actions += "Autorizar acesso às estatísticas"
-        if (!enabled) actions += "Ativar automação"
-        if (enabled) actions += "Desativar automação"
+        val monitor = Switch(activity).apply {
+            text = "Reabrir DIGI TV depois do standby"
+            isChecked = prefs.getBoolean(KEY_ENABLED, false)
+        }
+        val boot = Switch(activity).apply {
+            text = "Abrir DIGI TV quando a box liga"
+            isChecked = prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
+        }
+        root.addView(monitor)
+        root.addView(boot, params(activity, 0, 8))
 
-        AlertDialog.Builder(activity)
-            .setTitle("Automação automática")
-            .setMessage(message)
-            .setPositiveButton("Continuar") { _, _ ->
+        root.addView(label(activity, "Comportamento após standby"), params(activity, 16, 4))
+        val modeGroup = RadioGroup(activity).apply { orientation = RadioGroup.VERTICAL }
+        val modeA = RadioButton(activity).apply { id = 1; text = "Modo A — abrir sempre" }
+        val modeB = RadioButton(activity).apply { id = 2; text = "Modo B — só se DIGI TV era a última aplicação" }
+        modeGroup.addView(modeA)
+        modeGroup.addView(modeB)
+        modeGroup.check(if (prefs.getInt("mode", 2) == 1) 1 else 2)
+        root.addView(modeGroup)
+
+        root.addView(label(activity, "Atraso antes de reabrir"), params(activity, 12, 4))
+        val delayLabel = label(activity, "")
+        val delay = SeekBar(activity).apply {
+            max = 30
+            progress = prefs.getInt("delay_seconds", 5).coerceIn(0, 30)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, value: Int, fromUser: Boolean) {
+                    delayLabel.text = "$value segundos"
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        delayLabel.text = "${delay.progress} segundos"
+        root.addView(delayLabel)
+        root.addView(delay)
+
+        root.addView(label(activity, "Aplicação de destino"), params(activity, 16, 4))
+        val targetLabel = label(activity,
+            TargetAppResolver.displayName(activity, target) +
+                if (target == TargetAppResolver.DEFAULT_PACKAGE) " (padrão)" else "")
+        root.addView(targetLabel)
+        val chooseTarget = Button(activity).apply {
+            text = "Detetar novamente / escolher aplicação"
+            isAllCaps = false
+        }
+        root.addView(chooseTarget)
+        chooseTarget.setOnClickListener {
+            val refreshed = TargetAppResolver.candidates(activity)
+            val preferred = refreshed.filter { it.label.contains("digi", ignoreCase = true) }
+            val options = if (preferred.isNotEmpty()) preferred else refreshed
+            if (options.isEmpty()) {
+                Toast.makeText(activity, "Não foram encontradas aplicações Android TV compatíveis.", Toast.LENGTH_LONG).show()
+            } else {
                 AlertDialog.Builder(activity)
-                    .setTitle("O que pretendes fazer?")
-                    .setItems(actions.toTypedArray()) { _, which ->
-                        when (actions[which]) {
-                            "Ativar abertura da DIGI TV no arranque",
-                            "Desativar abertura da DIGI TV no arranque" -> {
-                                val newValue = !prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
-                                prefs.edit().putBoolean(KEY_LAUNCH_ON_BOOT, newValue).apply()
-                                Toast.makeText(
-                                    activity,
-                                    if (newValue) "A DIGI TV será aberta no arranque da box." else "Abertura automática no arranque desativada.",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                            "Autorizar «Mostrar sobre outras aplicações»" ->
-                                activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${activity.packageName}")))
-                            "Autorizar acesso às estatísticas" ->
-                                activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                            "Ativar automação" -> {
-                                val ready = Settings.canDrawOverlays(activity) &&
-                                    (prefs.getInt("mode", 2) == 1 || hasUsageAccess(activity))
-                                if (!ready) {
-                                    Toast.makeText(activity, "Concede primeiro as permissões indicadas e volta a abrir esta opção.", Toast.LENGTH_LONG).show()
-                                } else {
-                                    prefs.edit().putBoolean("automation_enabled", true).apply()
-                                    try {
-                                        AutomationService.start(activity)
-                                        Toast.makeText(activity, "Automação ativada. O serviço fica ativo em segundo plano.", Toast.LENGTH_LONG).show()
-                                    } catch (error: Exception) {
-                                        prefs.edit().putBoolean("automation_enabled", false).apply()
-                                        Toast.makeText(activity, "Não foi possível iniciar o serviço: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
-                            "Desativar automação" -> {
-                                prefs.edit().putBoolean("automation_enabled", false)
-                                    .putBoolean("wake_should_launch", false).apply()
-                                AutomationService.stop(activity)
-                                Toast.makeText(activity, "Automação desativada.", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                    .setTitle("Escolher aplicação DIGI TV")
+                    .setItems(options.map { "${it.label}  (${it.packageName})" }.toTypedArray()) { _, which ->
+                        TargetAppResolver.select(activity, options[which].packageName)
+                        targetLabel.text = options[which].label
                     }
-                    .setNegativeButton("Fechar", null)
+                    .setNegativeButton("Cancelar", null)
                     .show()
             }
-            .setNegativeButton("Fechar", null)
-            .show()
+        }
+
+        root.addView(label(activity, "Permissões necessárias"), params(activity, 16, 4))
+        val overlayButton = Button(activity).apply {
+            text = if (Settings.canDrawOverlays(activity)) "Sobreposição: autorizada" else "Autorizar mostrar sobre outras aplicações"
+            isAllCaps = false
+            setOnClickListener {
+                activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${activity.packageName}")))
+            }
+        }
+        root.addView(overlayButton)
+        val usageButton = Button(activity).apply {
+            text = if (hasUsageAccess(activity)) "Estatísticas de utilização: autorizadas" else "Autorizar acesso às estatísticas (Modo B)"
+            isAllCaps = false
+            setOnClickListener { activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }
+        }
+        root.addView(usageButton)
+
+        val dialog = AlertDialog.Builder(activity)
+            .setTitle("DAdA · Configurar")
+            .setView(android.widget.ScrollView(activity).apply { addView(root) })
+            .setPositiveButton("Guardar", null)
+            .setNegativeButton("Cancelar", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val selectedTarget = TargetAppResolver.selectedPackage(activity)
+                if (selectedTarget == null) {
+                    Toast.makeText(activity, "Seleciona uma aplicação DIGI TV antes de guardar.", Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
+                val wantsMonitor = monitor.isChecked
+                val wantsBoot = boot.isChecked
+                val mode = if (modeGroup.checkedRadioButtonId == 1) 1 else 2
+                if ((wantsMonitor || wantsBoot) && !Settings.canDrawOverlays(activity)) {
+                    Toast.makeText(activity, "Autoriza primeiro «Mostrar sobre outras aplicações».", Toast.LENGTH_LONG).show()
+                    activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${activity.packageName}")))
+                    return@setOnClickListener
+                }
+                if (wantsMonitor && mode == 2 && !hasUsageAccess(activity)) {
+                    Toast.makeText(activity, "O Modo B precisa de acesso às estatísticas de utilização.", Toast.LENGTH_LONG).show()
+                    activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                    return@setOnClickListener
+                }
+                prefs.edit()
+                    .putBoolean(KEY_ENABLED, wantsMonitor)
+                    .putBoolean(KEY_LAUNCH_ON_BOOT, wantsBoot)
+                    .putInt("mode", mode)
+                    .putInt("delay_seconds", delay.progress)
+                    .apply()
+                if (wantsMonitor) {
+                    try {
+                        AutomationService.start(activity)
+                    } catch (error: Exception) {
+                        prefs.edit().putBoolean(KEY_ENABLED, false).apply()
+                        Toast.makeText(activity, "Não foi possível iniciar a automação: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    AutomationService.stop(activity)
+                }
+                Toast.makeText(activity, "Configuração do DAdA guardada.", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
+                onSaved()
+            }
+        }
+        dialog.show()
     }
 
     fun startIfEnabled(context: Context) {
         if (!context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getBoolean("automation_enabled", false)) return
+                .getBoolean(KEY_ENABLED, false)) return
         try {
             AutomationService.start(context)
         } catch (error: Exception) {
@@ -109,4 +181,20 @@ object AutomationFeature {
         return appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS,
             Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
     }
+
+    private fun label(context: Context, value: String) = TextView(context).apply {
+        text = value
+        textSize = 15f
+        setTextColor(0xFFFFFFFF.toInt())
+        setPadding(0, dp(context, 5), 0, dp(context, 5))
+    }
+
+    private fun params(context: Context, top: Int, bottom: Int) =
+        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(context, top)
+            bottomMargin = dp(context, bottom)
+        }
+
+    private fun dp(context: Context, value: Int): Int =
+        (value * context.resources.displayMetrics.density).toInt()
 }

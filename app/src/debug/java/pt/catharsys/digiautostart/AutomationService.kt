@@ -40,19 +40,30 @@ class AutomationService : Service() {
             return START_NOT_STICKY
         }
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (!prefs.getBoolean(KEY_ENABLED, false)) {
+        val automationEnabled = prefs.getBoolean(KEY_ENABLED, false)
+        val bootLaunchRequested = intent?.action == ACTION_BOOT_COMPLETED &&
+            prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
+        if (!automationEnabled && !bootLaunchRequested) {
             stopSelf()
             return START_NOT_STICKY
         }
         startAsForeground()
-        registerScreenReceiver()
-        DiagnosticsFeature.record(this, "automation_service_started")
-        if (intent?.action == ACTION_BOOT_COMPLETED &&
-            prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)) {
+        if (automationEnabled) registerScreenReceiver()
+        DiagnosticsFeature.record(this, "automation_service_started",
+            "monitor_enabled=$automationEnabled,boot_launch=$bootLaunchRequested")
+        if (bootLaunchRequested) {
             DiagnosticsFeature.record(this, "automation_boot_launch_scheduled", "delay_seconds=$BOOT_LAUNCH_DELAY_SECONDS")
-            handler.postDelayed({ launchTarget("boot") }, BOOT_LAUNCH_DELAY_SECONDS * 1000L)
+            handler.postDelayed({
+                launchTarget("boot")
+                if (!automationEnabled) {
+                    handler.postDelayed({
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }, VERIFY_LAUNCH_DELAY_MS + 1000L)
+                }
+            }, BOOT_LAUNCH_DELAY_SECONDS * 1000L)
         }
-        return START_STICKY
+        return if (automationEnabled) START_STICKY else START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -80,8 +91,8 @@ class AutomationService : Service() {
             }
         val notification = builder
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("DigiAutoStart ativo")
-            .setContentText("A aguardar que a box saia do standby")
+            .setContentTitle("DAdA ativo")
+            .setContentText("Assistente de arranque da DIGI TV em execução")
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
@@ -97,8 +108,8 @@ class AutomationService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < 26) return
-        val channel = NotificationChannel(CHANNEL_ID, "Automação DigiAutoStart", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Indica que DigiAutoStart está a monitorizar o despertar da box."
+        val channel = NotificationChannel(CHANNEL_ID, "Automação DAdA", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Indica que o DAdA está a monitorizar o despertar da box."
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -165,7 +176,8 @@ class AutomationService : Service() {
                 packageName == homePackage || packageName == "com.android.systemui") continue
             lastUserPackage = packageName
         }
-        return lastUserPackage == TARGET_PACKAGE
+        val targetPackage = TargetAppResolver.selectedPackage(this) ?: return false
+        return lastUserPackage == targetPackage
     }
 
     private fun handleScreenOn() {
@@ -184,7 +196,12 @@ class AutomationService : Service() {
             DiagnosticsFeature.record(this, "automation_launch_blocked", "reason=overlay_permission_missing,trigger=$reason")
             return
         }
-        val launchIntent = packageManager.getLaunchIntentForPackage(TARGET_PACKAGE)
+        val targetPackage = TargetAppResolver.selectedPackage(this)
+        if (targetPackage == null) {
+            DiagnosticsFeature.record(this, "automation_launch_failed", "reason=target_app_not_detected,trigger=$reason")
+            return
+        }
+        val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
         if (launchIntent == null) {
             DiagnosticsFeature.record(this, "automation_launch_failed", "reason=no_launch_intent,trigger=$reason")
             return
@@ -211,7 +228,7 @@ class AutomationService : Service() {
             events.getNextEvent(event)
             if ((event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                     event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) &&
-                event.packageName == TARGET_PACKAGE && event.timeStamp >= launchRequestedAt) {
+                event.packageName == TargetAppResolver.selectedPackage(this) && event.timeStamp >= launchRequestedAt) {
                 targetResumed = true
             }
         }

@@ -6,18 +6,12 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.RadioGroup
 import android.widget.ScrollView
-import android.widget.SeekBar
 import android.widget.TextView
-import android.widget.Toast
 
 class MainActivity : Activity() {
-    private val targetPackage = "ro.digionline.tv"
     private val preferences by lazy { getSharedPreferences("digi_autostart", MODE_PRIVATE) }
     private lateinit var status: TextView
-    private lateinit var delayValue: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,13 +49,10 @@ class MainActivity : Activity() {
             setPadding(dp(28), dp(24), dp(28), dp(24))
             setBackgroundColor(0xFF101820.toInt())
         }
-
-        content.addView(text("DigiAutoStart", 30f, true).apply {
-            setTextColor(0xFFFFFFFF.toInt())
-        })
+        content.addView(text("DAdA", 34f, true).apply { setTextColor(0xFFFFFFFF.toInt()) })
         val buildLabel = "${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEBUG) " • DEBUG" else ""
-        content.addView(text("DIGI TV • Assistente de arranque • $buildLabel", 14f).apply {
-            setTextColor(0xFFB8C7D1.toInt())
+        content.addView(text("DIGI TV · Assistente de arranque · $buildLabel", 15f).apply {
+            setTextColor(0xFFB8DDF2.toInt())
         }, margin(top = 4, bottom = 20))
 
         status = text("", 18f, true).apply {
@@ -71,95 +62,35 @@ class MainActivity : Activity() {
         }
         content.addView(status, margin(bottom = 20))
 
-        content.addView(text("Modo pretendido", 20f, true).apply {
-            setTextColor(0xFFFFFFFF.toInt())
-        }, margin(bottom = 8))
+        DebugMenuFeature.addButtons(this, content) { refreshStatus() }
 
-        val modeGroup = RadioGroup(this).apply { orientation = RadioGroup.VERTICAL }
-        val always = radio("Modo A — abrir sempre após sair de standby", 1)
-        val last = radio("Modo B — só se DIGI TV era a última aplicação", 2)
-        modeGroup.addView(always)
-        modeGroup.addView(last)
-        modeGroup.check(if (preferences.getInt("mode", 2) == 1) 1 else 2)
-        modeGroup.setOnCheckedChangeListener { _, checked ->
-            preferences.edit().putInt("mode", if (checked == 1) 1 else 2).apply()
-        }
-        content.addView(modeGroup, margin(bottom = 18))
-
-        content.addView(text("Atraso pretendido antes de abrir", 18f, true).apply {
-            setTextColor(0xFFFFFFFF.toInt())
-        })
-        delayValue = text("", 16f).apply { setTextColor(0xFFB8C7D1.toInt()) }
-        content.addView(delayValue, margin(top = 4))
-        val delay = SeekBar(this).apply {
-            max = 30
-            progress = preferences.getInt("delay_seconds", 5).coerceIn(0, 30)
-            contentDescription = "Atraso em segundos"
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, value: Int, fromUser: Boolean) {
-                    delayValue.text = "$value segundos"
-                    if (fromUser) preferences.edit().putInt("delay_seconds", value).apply()
-                }
-                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-            })
-        }
-        content.addView(delay, margin(bottom = 20))
-        delayValue.text = "${delay.progress} segundos"
-
-        content.addView(button("Testar abertura da DIGI TV") { launchDigiTv() }, margin(bottom = 12))
-        content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 20))
-
-        if (BuildConfig.DEBUG) {
-            content.addView(button("Configurar automação (teste)") { AutomationFeature.configure(this) }, margin(bottom = 12))
-            content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
-            content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
-        }
-
-        content.addView(text("Estado desta versão", 20f, true).apply {
-            setTextColor(0xFFFFFFFF.toInt())
-        }, margin(bottom = 8))
+        content.addView(text("Sobre o DAdA", 20f, true).apply { setTextColor(0xFFFFFFFF.toInt()) }, margin(bottom = 8))
         content.addView(text(
-            "Esta versão inclui automação experimental: um serviço em primeiro plano mantém a deteção de standby/retoma ativa, tenta abrir a DIGI TV segundo o modo escolhido e solicita recuperação após reinício da box. Configura-a em «Configurar automação (teste)». O comportamento ainda precisa de validação nesta box.",
+            "Assistente de arranque da DIGI TV. A configuração reúne as opções de abertura ao ligar a box, reabertura após standby, permissões e seleção da aplicação. A deteção automática mantém a aplicação oficial como padrão.",
             16f
         ).apply { setTextColor(0xFFD2DCE2.toInt()) }, margin(bottom = 14))
-
         content.addView(text(
-            "A aplicação não altera o launcher, firmware, bootloader nem partições do equipamento.",
+            "O DAdA não altera o launcher, firmware, bootloader nem partições do equipamento.",
             14f
         ).apply { setTextColor(0xFF8FA3AE.toInt()) })
 
-        setContentView(ScrollView(this).apply {
-            isFillViewport = true
-            addView(content)
-        })
+        setContentView(ScrollView(this).apply { isFillViewport = true; addView(content) })
     }
 
     private fun refreshStatus() {
-        status.text = if (packageManager.getLaunchIntentForPackage(targetPackage) != null) {
-            "DIGI TV instalada • pronta para teste"
-        } else {
-            "DIGI TV não encontrada • confirma que está instalada"
+        val target = TargetAppResolver.selectedPackage(this)
+        val monitor = preferences.getBoolean("automation_enabled", false)
+        val boot = preferences.getBoolean("launch_digi_on_boot", false)
+        status.text = buildString {
+            append("Aplicação: ")
+            append(TargetAppResolver.displayName(this@MainActivity, target))
+            append("\nAutomação após standby: ")
+            append(if (monitor) "ativa" else "desativada")
+            append("\nAbrir ao ligar a box: ")
+            append(if (boot) "ativo" else "desativado")
         }
-        DiagnosticsFeature.record(this, "target_status_checked", "launch_intent_available=${packageManager.getLaunchIntentForPackage(targetPackage) != null}")
-    }
-
-    private fun launchDigiTv() {
-        DiagnosticsFeature.record(this, "manual_launch_requested")
-        val intent = packageManager.getLaunchIntentForPackage(targetPackage)
-        if (intent == null) {
-            refreshStatus()
-            DiagnosticsFeature.record(this, "manual_launch_failed", "reason=no_launch_intent")
-            Toast.makeText(this, "Não foi encontrada uma atividade de arranque da DIGI TV.", Toast.LENGTH_LONG).show()
-            return
-        }
-        try {
-            startActivity(intent)
-            DiagnosticsFeature.record(this, "manual_launch_start_activity_returned")
-        } catch (error: Exception) {
-            DiagnosticsFeature.record(this, "manual_launch_exception", "exception=${error.javaClass.simpleName}")
-            Toast.makeText(this, "Não foi possível abrir a DIGI TV: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
-        }
+        DiagnosticsFeature.record(this, "target_status_checked",
+            "target_package=${target ?: "none"},monitor_enabled=$monitor,launch_on_boot=$boot")
     }
 
     private fun text(value: String, size: Float, bold: Boolean = false) = TextView(this).apply {
@@ -169,22 +100,13 @@ class MainActivity : Activity() {
         gravity = Gravity.CENTER_VERTICAL
     }
 
-    private fun radio(value: String, idValue: Int) = RadioButton(this).apply {
-        id = idValue
-        text = value
-        textSize = 16f
-        setTextColor(0xFFFFFFFF.toInt())
-        minHeight = dp(54)
-        isFocusable = true
-    }
-
     private fun button(value: String, action: () -> Unit) = Button(this).apply {
         text = value
         textSize = 16f
         isAllCaps = false
         minHeight = dp(56)
         isFocusable = true
-        setOnClickListener { action() }
+        setOnClickListener { action(); refreshStatus() }
     }
 
     private fun margin(bottom: Int = 0, top: Int = 0) =
