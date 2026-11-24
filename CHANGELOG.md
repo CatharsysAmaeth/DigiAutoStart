@@ -1,12 +1,14 @@
 # Changelog
 
-## 0.5.3 — DAdA branding and clearer startup controls
+## 0.5.3 — DAdA branding, unified configuration and target discovery
 
-- Rename the app shown on Android TV to DAdA.
-- Use the product subtitle “DIGI TV · Assistente de arranque”.
-- Add a blue Android TV adaptive launcher icon.
-- Make the automation entry point explicit on the main screen.
-- Clarify the independent option to open DIGI TV when the box starts.
+- Rename the app shown on Android TV to DAdA and add a blue adaptive launcher icon.
+- Simplify the home screen; refresh the detected app and automation state automatically.
+- Remove the manual DIGI TV launch test and the redundant manual status refresh.
+- Consolidate standby mode, delay, boot launch, permissions and target selection under “Configurar”.
+- Keep ro.digionline.tv as the default target and discover replacement Android TV launcher apps when it is unavailable.
+- Automatically select a replacement only when exactly one unambiguous DIGI-labelled candidate exists; otherwise require user selection.
+- Use the selected package consistently for standby and boot launch.
 
 ## 0.5.2 — boot behavior and launch verification
 
@@ -18,27 +20,9 @@
 ## 0.5.0 — persistent standby automation prototype
 
 - Added Debug foreground service to keep SCREEN_OFF / SCREEN_ON receiver registered outside the Activity.
-- Added sticky service restart and BOOT_COMPLETED recovery when automation is enabled.
-- Added notification with explicit stop action.
-- Implemented Mode A and Mode B last-foreground-app decision, with Home/System UI excluded.
-- Restored Debug package-install permission required by the private APK updater.
-- Kept automation components and permissions out of Release.
-
-## 0.4.0 — initial standby automation prototype
-
-- Added Debug-only dynamic screen receiver, launch decision and diagnostics.
-- Added Mode A wake scheduling and Mode B Usage Access lookup.
-- Added setup for Android background-launch exemption.
-
-## 0.3.0 — private Debug updater
-
-- Added private Debug APK update check, SHA-256 verification and Android installer handoff.
-- Added automatic upload of AES-256 encrypted diagnostics reports.
-
-## 0.2.0 — debug diagnostics
-
-- Added opt-in bounded Debug-only diagnostics capture and encrypted ZIP export.
+- Added Mode A / Mode B decisions and configurable delay.
+- Added bounded, opt-in encrypted diagnostics for device testing.
 
 ## 0.1.0 — initial device-test build
 
-- Added TV-friendly interface, preferences and manual DIGI TV launch.
+- Added TV-friendly interface and preferences.
