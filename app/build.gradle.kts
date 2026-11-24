@@ -3,8 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val diagnosticsTokenB64 = System.getenv("DIAGNOSTICS_REPO_TOKEN_B64").orEmpty()
-val diagnosticsPasswordB64 = System.getenv("DIAGNOSTICS_ZIP_PASSWORD_B64").orEmpty()
+val privateRepositoryB64 = System.getenv("DADA_PRIVATE_REPOSITORY_B64").orEmpty()
+val privateTokenB64 = System.getenv("DADA_PRIVATE_TOKEN_B64").orEmpty()
+val debugReportPasswordB64 = System.getenv("DADA_DEBUG_REPORT_PASSWORD_B64").orEmpty()
 val stableDebugStorePath = System.getenv("DIGIAUTOSTART_SIGNING_STORE_FILE").orEmpty()
 val stableDebugStorePassword = System.getenv("DIGIAUTOSTART_SIGNING_STORE_PASSWORD").orEmpty()
 
@@ -37,8 +38,9 @@ android {
             if (stableDebugStorePath.isNotBlank()) {
                 signingConfig = signingConfigs.getByName("stableDebug")
             }
-            buildConfigField("String", "DIAGNOSTICS_GITHUB_TOKEN_B64", "\"$diagnosticsTokenB64\"")
-            buildConfigField("String", "DIAGNOSTICS_ZIP_PASSWORD_B64", "\"$diagnosticsPasswordB64\"")
+            buildConfigField("String", "DADA_PRIVATE_REPOSITORY_B64", "\"$privateRepositoryB64\"")
+            buildConfigField("String", "DADA_PRIVATE_TOKEN_B64", "\"$privateTokenB64\"")
+            buildConfigField("String", "DADA_DEBUG_REPORT_PASSWORD_B64", "\"$debugReportPasswordB64\"")
         }
         getByName("release") {
             signingConfig = if (stableDebugStorePath.isNotBlank()) signingConfigs.getByName("stableDebug") else signingConfigs.getByName("debug")
