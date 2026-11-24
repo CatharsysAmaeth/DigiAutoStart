@@ -87,7 +87,7 @@ Version 0.1.0 validated installation, TV navigation and saved preferences before
 
 Status: Accepted
 
-Diagnostic collection and the private test updater remain confined to Debug builds. The normal Release contains no diagnostic upload implementation or Debug test-updater code.
+Diagnostic collection and internal test-update tools remain confined to Debug builds. The normal Release contains no diagnostic upload implementation or Debug test-update code.
 
 ## D-013: Promote tested automation to Release
 
