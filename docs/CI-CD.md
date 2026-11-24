@@ -23,14 +23,14 @@ The workflow:
 1. Runs unit tests.
 2. Builds Debug and normal Release APKs.
 3. Checks that Release contains the standby/startup automation and required permissions.
-4. Checks that Release excludes private diagnostics, the test updater and Debug-only network/package-install permissions.
+4. Checks that Release excludes diagnostic tools, internal test-update tools and Debug-only network/package-install permissions.
 5. Creates or updates a versioned GitHub Release with the stable APK only from `main`; pull requests do not publish it.
 
 A successful CI build proves that compilation, unit tests and APK-content checks passed. It does not replace physical-device validation of standby/wake behavior.
 
 ## Signing and updates
 
-Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material is kept outside the public repository in protected CI storage. Never commit signing material or passwords.
+Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material and internal distribution settings are kept outside the public source tree in protected CI secrets. Never commit signing material or passwords.
 
 ## Device testing boundary
 
