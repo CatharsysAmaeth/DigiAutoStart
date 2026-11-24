@@ -80,8 +80,8 @@ class AutomationService : Service() {
             }
         val notification = builder
             .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentTitle("DigiAutoStart ativo")
-            .setContentText("A aguardar que a box saia do standby")
+            .setContentTitle("DAdA ativo")
+            .setContentText("Assistente de arranque da DIGI TV em execução")
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
@@ -97,8 +97,8 @@ class AutomationService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT < 26) return
-        val channel = NotificationChannel(CHANNEL_ID, "Automação DigiAutoStart", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Indica que DigiAutoStart está a monitorizar o despertar da box."
+        val channel = NotificationChannel(CHANNEL_ID, "Automação DAdA", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Indica que o DAdA está a monitorizar o despertar da box."
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
