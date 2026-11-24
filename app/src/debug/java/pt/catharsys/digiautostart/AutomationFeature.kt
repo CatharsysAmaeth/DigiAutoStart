@@ -28,7 +28,7 @@ import android.widget.Toast
 object AutomationFeature {
     private const val PREFS = "digi_autostart"
     private const val TARGET_PACKAGE = "ro.digionline.tv"
-    private const val LOOKBACK_MS = 15 * 60 * 1000L
+    private const val LOOKBACK_MS = 24 * 60 * 60 * 1000L
     private var receiver: BroadcastReceiver? = null
     private val handler = Handler(Looper.getMainLooper())
 
