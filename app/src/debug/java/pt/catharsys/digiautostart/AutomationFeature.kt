@@ -49,12 +49,20 @@ object AutomationFeature {
                             "Ativar: abrir DIGI TV ao ligar a box",
                             "Desativar: abrir DIGI TV ao ligar a box" -> {
                                 val newValue = !prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
-                                prefs.edit().putBoolean(KEY_LAUNCH_ON_BOOT, newValue).apply()
-                                Toast.makeText(
-                                    activity,
-                                    if (newValue) "A DIGI TV será aberta no arranque da box." else "Abertura automática no arranque desativada.",
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                if (newValue && !Settings.canDrawOverlays(activity)) {
+                                    Toast.makeText(activity,
+                                        "Para abrir a DIGI TV automaticamente, autoriza primeiro «Mostrar sobre outras aplicações».",
+                                        Toast.LENGTH_LONG).show()
+                                    activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${activity.packageName}")))
+                                } else {
+                                    prefs.edit().putBoolean(KEY_LAUNCH_ON_BOOT, newValue).apply()
+                                    Toast.makeText(
+                                        activity,
+                                        if (newValue) "O DAdA vai abrir a DIGI TV quando a box ligar." else "Abertura da DIGI TV ao ligar a box desativada.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
                             }
                             "Autorizar «Mostrar sobre outras aplicações»" ->
                                 activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
