@@ -1,28 +1,32 @@
 # Debug diagnostics
 
-## Scope
+Diagnostics are Debug-only and opt-in. They capture DigiAutoStart lifecycle events, screen broadcasts and the automation service's own decisions and launch outcomes.
 
-Diagnostics are isolated under src/debug. Release receives a no-op API shim and excludes the diagnostics UI, receiver, INTERNET permission, FileProvider, updater and ZIP encryption/upload dependencies.
+## Automation events
 
-The Debug build records app-owned lifecycle/launch events and ACTION_SCREEN_ON / ACTION_SCREEN_OFF observations while the app process is alive. These broadcasts are observations, not proof of a hardware standby state.
+- Service start, destruction and screen receiver registration.
+- SCREEN_OFF decision: selected mode and whether DIGI TV was the last foreground user app.
+- Missing Usage Access.
+- SCREEN_ON decision and scheduled delay.
+- Launch blocked, missing launch intent, exception, or startActivity call returned.
 
-Version 0.4.0 also records the experimental automation receiver's decisions: last foreground package (Mode B), whether launch was scheduled, and launch success/exception/permission-blocked outcomes. It does not collect a general usage history or export unrelated app activity.
+The implementation does not export a general app-usage history. Mode B reads UsageEvents transiently and records only whether DIGI TV matched the last foreground user app.
 
-## Privacy and retention
+## Runtime architecture
+
+The Debug foreground service keeps the dynamic screen receiver alive while the Activity is stopped. It uses START_STICKY and a BOOT_COMPLETED receiver to request recovery after process reclamation and device reboot. A persistent notification is displayed while enabled.
+
+## Permissions
+
+- Usage Access: Mode B only.
+- Display over other apps: Android background-activity-launch exemption.
+- Foreground service and boot completed: keep and restore the receiver.
+- Internet, FileProvider and package-install permission: Debug diagnostics/update flow.
+
+These permissions and components are absent from Release. No root, accessibility service, overlay window, bootloader or firmware modification is used.
+
+## Privacy
 
 - Capture is opt-in and bounded to approximately 1 MiB plus one previous segment.
 - No serial number, MAC address, IP address, SSID, account information, credentials or DIGI TV content is collected.
-- Device summary contains Android version, manufacturer/model and app version.
-- Reports are AES-256 encrypted and uploaded to the private diagnostics repo.
-
-## Automation test permissions
-
-The Debug-only automation prototype may ask the user to grant:
-- **Usage Access** — only required for Mode B, to identify the most recently resumed package at screen-off.
-- **Display over other apps** — used as Android's documented exception for starting an Activity from the background. DigiAutoStart does not draw an overlay.
-
-These permissions are not added to the Release manifest. They do not require root, bootloader changes or firmware modifications.
-
-## Known limitation
-
-The screen receiver is dynamically registered while the process is alive. If Android kills the process, it cannot observe the next wake until DigiAutoStart is opened again. A persistent service/restart strategy is a separate decision and has not yet been implemented.
+- Reports are AES-256 encrypted and uploaded to the private diagnostics repository.
