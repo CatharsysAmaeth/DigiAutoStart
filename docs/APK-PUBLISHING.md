@@ -1,10 +1,13 @@
 # APK publishing
 
-The `android-ci` workflow builds and tests both variants on pushes to `main`.
+The Android CI workflow builds and tests the Debug and normal Release variants.
 
-- The Release APK is committed to `apk/DigiAutoStart-normal.apk` in this public repository.
-- The Debug APK is uploaded to `apk/DigiAutoStart-debug.apk` in the private `DigiAutoStart-Diagnostics` repository.
-- The private upload uses the `DIAGNOSTICS_REPO_TOKEN` Actions secret. It must be a fine-grained token scoped to the private diagnostics repository with Contents read/write permission.
-- Pull requests build and test the APKs but do not publish them.
+- The normal Release APK is published at `apk/DigiAutoStart-normal.apk` after changes are merged to `main`.
+- Release includes the user-facing configuration and tested standby/startup automation.
+- Release excludes Debug menus, diagnostic collection, private test-updater code and Debug-only network/package-install permissions.
+- Debug builds are for development and device testing; they are not presented as normal public releases.
+- Pull requests build and test both variants but do not publish the public APK.
 
-The Release APK is checked to ensure that diagnostics code, Zip4j, and the Debug-only internet permission are absent.
+The workflow checks the contents of the Release manifest and DEX files: automation must be present, while private diagnostics and Debug-only tools must be absent.
+
+Signing material and credentials are kept outside the public source tree in protected CI configuration. Never commit a keystore, private key, password, token or credential.
