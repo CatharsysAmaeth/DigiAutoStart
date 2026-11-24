@@ -32,22 +32,22 @@ object AutomationFeature {
             append("\n\nO serviço mantém uma notificação discreta e monitoriza a saída do standby.")
         }
         val actions = mutableListOf<String>()
-        actions += if (launchOnBoot) "Desativar abertura da DIGI TV no arranque" else "Ativar abertura da DIGI TV no arranque"
+        actions += if (launchOnBoot) "Desativar: abrir DIGI TV ao ligar a box" else "Ativar: abrir DIGI TV ao ligar a box"
         if (!overlay) actions += "Autorizar «Mostrar sobre outras aplicações»"
         if (mode != 1 && !usage) actions += "Autorizar acesso às estatísticas"
         if (!enabled) actions += "Ativar automação"
         if (enabled) actions += "Desativar automação"
 
         AlertDialog.Builder(activity)
-            .setTitle("Automação automática")
+            .setTitle("DAdA · Arranque automático")
             .setMessage(message)
             .setPositiveButton("Continuar") { _, _ ->
                 AlertDialog.Builder(activity)
                     .setTitle("O que pretendes fazer?")
                     .setItems(actions.toTypedArray()) { _, which ->
                         when (actions[which]) {
-                            "Ativar abertura da DIGI TV no arranque",
-                            "Desativar abertura da DIGI TV no arranque" -> {
+                            "Ativar: abrir DIGI TV ao ligar a box",
+                            "Desativar: abrir DIGI TV ao ligar a box" -> {
                                 val newValue = !prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
                                 prefs.edit().putBoolean(KEY_LAUNCH_ON_BOOT, newValue).apply()
                                 Toast.makeText(
