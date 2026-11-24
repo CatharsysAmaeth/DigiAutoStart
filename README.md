@@ -18,7 +18,6 @@ O DAdA é uma aplicação leve para Android TV que permite voltar a abrir a apli
 - Desenvolvido para dispositivos Android TV com Android 12 ou posterior.
 - Mantém o launcher original e a certificação da plataforma.
 - Não requer acesso root, desbloqueio do bootloader, firmware personalizado ou alterações a partições protegidas.
-- A documentação pública não inclui identificadores do equipamento, credenciais, material de assinatura ou dados pessoais e da rede.
 
 As políticas do Android e do fabricante relativas à execução em segundo plano podem limitar a abertura automática. O DAdA verifica se a aplicação selecionada passa efetivamente para primeiro plano; o simples pedido de abertura não garante que fique visível.
 
