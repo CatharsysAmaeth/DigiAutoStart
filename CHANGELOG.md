@@ -4,16 +4,25 @@ All notable project changes are documented here.
 
 ## Unreleased
 
-- Added an opt-in, bounded Debug-only diagnostics capture.
-- Added app lifecycle, manual launch and screen broadcast observations.
-- Added AES-256 encrypted ZIP export and Android share-sheet handoff.
-- Kept diagnostics implementation and dependencies out of the Release source set.
-- Added optional upload of encrypted ZIP reports to the dedicated private GitHub repository using a repository-scoped fine-grained token protected by Android Keystore.
-- Automatic standby detection and automatic launching are not implemented yet.
+- Validate the Debug-only standby/wake automation prototype on the DIGI R1A.
+- Determine whether a persistent process strategy is necessary.
+
+## 0.4.0 — experimental standby automation
+
+- Added Debug-only dynamic SCREEN_OFF / SCREEN_ON automation receiver.
+- Added Mode A wake scheduling and Mode B last-foreground-app detection via Usage Access.
+- Added explicit setup for Android background-launch overlay exemption.
+- Added diagnostic decision and launch outcome events.
+- Kept automation permissions and UI out of Release.
+
+## 0.3.0 — private Debug updater
+
+- Added private Debug APK update check, SHA-256 verification and Android installer handoff.
+- Added automatic upload of AES-256 encrypted diagnostics reports.
 
 ## 0.2.0 — debug diagnostics
 
-- Debug test build with opt-in local event capture and encrypted ZIP export.
+- Added opt-in bounded Debug-only diagnostics capture and encrypted ZIP export.
 
 ## 0.1.0 — initial device-test build
 
