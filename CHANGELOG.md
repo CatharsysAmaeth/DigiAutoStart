@@ -1,6 +1,6 @@
 # Changelog
 
-All notable user-facing changes are documented here. Internal diagnostics, private service locations, device identifiers, credentials, signing material and personal/network details are intentionally excluded.
+All notable user-facing changes are documented here. Internal diagnostics, internal service locations, device identifiers, credentials, signing material and personal/network details are intentionally excluded.
 
 ## 0.6.0 — First normal Release with automatic startup
 
@@ -9,7 +9,7 @@ All notable user-facing changes are documented here. Internal diagnostics, priva
 - Keep the wake delay configurable.
 - Add optional launch of the selected TV app when the device starts, independently of the standby mode.
 - Restore enabled automation after a device restart or app update.
-- Keep the configuration screen in Release while excluding Debug menus, diagnostic collection and the private test updater.
+- Keep the configuration screen in Release while excluding Debug menus, diagnostic collection and internal test utilities.
 - Preserve the original Android TV launcher and platform certification; no root access, bootloader unlocking or firmware modification is required.
 
 ## 0.5.4 — DAdA visual identity
