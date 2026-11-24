@@ -29,7 +29,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         DiagnosticsFeature.attach(applicationContext)
-        AutomationFeature.attach(applicationContext)
+        AutomationFeature.startIfEnabled(applicationContext)
         DiagnosticsFeature.record(this, "activity_started")
     }
 
