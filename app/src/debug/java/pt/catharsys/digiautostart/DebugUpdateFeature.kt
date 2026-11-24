@@ -15,25 +15,18 @@ import java.net.URL
 import java.security.MessageDigest
 
 object DebugUpdateFeature {
-    private const val OWNER = "CatharsysAmaeth"
-    private const val REPO = "DigiAutoStart-Diagnostics"
-    private const val API = "https://api.github.com/repos/$OWNER/$REPO/contents"
-
     fun check(activity: Activity) {
-        val token = try {
-            String(android.util.Base64.decode(BuildConfig.DIAGNOSTICS_GITHUB_TOKEN_B64, android.util.Base64.DEFAULT), Charsets.UTF_8)
-        } catch (_: Exception) {
-            ""
-        }
-        if (token.isBlank()) {
-            Toast.makeText(activity, "Esta compilação não tem acesso ao repositório privado.", Toast.LENGTH_LONG).show()
+        val token = decode(BuildConfig.DADA_PRIVATE_TOKEN_B64)
+        val api = privateAssetsApi()
+        if (token.isBlank() || api == null) {
+            Toast.makeText(activity, "Esta compilação não está configurada para o canal de atualização interno.", Toast.LENGTH_LONG).show()
             return
         }
 
         Toast.makeText(activity, "A verificar atualizações…", Toast.LENGTH_SHORT).show()
         Thread {
             try {
-                val metadataText = getText(token, "$API/apk/version.json")
+                val metadataText = getText(token, "$api/apk/version.json")
                 val metadata = JSONObject(metadataText)
                 val remoteCode = metadata.getInt("versionCode")
                 val remoteName = metadata.getString("versionName")
@@ -44,7 +37,7 @@ object DebugUpdateFeature {
                     return@Thread
                 }
 
-                val apk = downloadApk(activity.applicationContext, token, "$API/apk/DigiAutoStart-debug.apk")
+                val apk = downloadApk(activity.applicationContext, token, "$api/apk/DigiAutoStart-debug.apk")
                 val expectedSha = metadata.getString("sha256").lowercase()
                 val actualSha = sha256(apk)
                 if (!actualSha.equals(expectedSha, ignoreCase = true)) {
@@ -65,6 +58,16 @@ object DebugUpdateFeature {
                 }
             }
         }.start()
+    }
+
+    private fun decode(encoded: String): String = try {
+        if (encoded.isBlank()) "" else String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT), Charsets.UTF_8)
+    } catch (_: Exception) { "" }
+
+    private fun privateAssetsApi(): String? {
+        val repository = decode(BuildConfig.DADA_PRIVATE_REPOSITORY_B64)
+        return repository.takeIf { it.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")) }
+            ?.let { "https://api.github.com/repos/$it/contents" }
     }
 
     private fun getText(token: String, endpoint: String): String {
