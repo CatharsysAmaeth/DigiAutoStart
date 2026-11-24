@@ -158,21 +158,30 @@ jobs:
             exit 1
           fi
 
-      - name: Publish normal APK in public repository
+      - name: Publish stable APK as a public GitHub Release
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p apk
-          install -m 0644 app/build/outputs/apk/release/app-release.apk apk/DigiAutoStart-normal.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apk/DigiAutoStart-normal.apk
-          if ! git diff --cached --quiet; then
-            git commit -m "build: publish normal APK"
-            git push
+          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\\1/p' app/build.gradle.kts | head -n1)"
+          if [ -z "$VERSION_NAME" ]; then
+            echo "::error::Could not determine the application version."
+            exit 1
+          fi
+          TAG="v$VERSION_NAME"
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+
+          # Keep binary APKs out of the public source tree. Publish the stable APK
+          # as a versioned asset attached to the corresponding GitHub Release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK#DAdA-$VERSION_NAME.apk" --clobber
           else
-            echo "Normal APK is unchanged; no commit needed."
+            gh release create "$TAG" "$APK#DAdA-$VERSION_NAME.apk" \\
+              --title "DAdA $VERSION_NAME" \\
+              --generate-notes
           fi
 
       - name: Publish Debug APK and version metadata in private repository
