@@ -176,7 +176,8 @@ class AutomationService : Service() {
                 packageName == homePackage || packageName == "com.android.systemui") continue
             lastUserPackage = packageName
         }
-        val targetPackage = TargetAppResolver.selectedPackage(this) ?: return false\n        return lastUserPackage == targetPackage
+        val targetPackage = TargetAppResolver.selectedPackage(this) ?: return false
+        return lastUserPackage == targetPackage
     }
 
     private fun handleScreenOn() {
@@ -195,7 +196,12 @@ class AutomationService : Service() {
             DiagnosticsFeature.record(this, "automation_launch_blocked", "reason=overlay_permission_missing,trigger=$reason")
             return
         }
-        val targetPackage = TargetAppResolver.selectedPackage(this)\n        if (targetPackage == null) {\n            DiagnosticsFeature.record(this, "automation_launch_failed", "reason=target_app_not_detected,trigger=$reason")\n            return\n        }\n        val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
+        val targetPackage = TargetAppResolver.selectedPackage(this)
+        if (targetPackage == null) {
+            DiagnosticsFeature.record(this, "automation_launch_failed", "reason=target_app_not_detected,trigger=$reason")
+            return
+        }
+        val launchIntent = packageManager.getLaunchIntentForPackage(targetPackage)
         if (launchIntent == null) {
             DiagnosticsFeature.record(this, "automation_launch_failed", "reason=no_launch_intent,trigger=$reason")
             return
