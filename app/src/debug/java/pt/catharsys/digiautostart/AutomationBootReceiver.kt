@@ -21,7 +21,7 @@ class AutomationBootReceiver : BroadcastReceiver() {
         }
 
         try {
-            AutomationService.start(context, fromBoot = true)
+            AutomationService.start(context, fromBoot = intent.action == Intent.ACTION_BOOT_COMPLETED)
             DiagnosticsFeature.record(
                 context,
                 "automation_recovery_requested",
