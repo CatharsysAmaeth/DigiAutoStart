@@ -70,9 +70,32 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/digiautostart-signing"
-          gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/signing/debug.keystore.b64?ref=main" --jq '.content' |
-            tr -d '\n' | base64 -d > "$RUNNER_TEMP/digiautostart-signing/debug.keystore"
-          echo "DIGIAUTOSTART_SIGNING_STORE_FILE=$RUNNER_TEMP/digiautostart-signing/debug.keystore" >> "$GITHUB_ENV"
+          KEYSTORE="$RUNNER_TEMP/digiautostart-signing/debug.keystore"
+          KEY_B64=/tmp/digiautostart-debug-keystore.b64
+
+          # Generate a valid JKS key on the first run; reuse the private copy thereafter.
+          if gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/signing/debug.keystore.b64?ref=main" --jq '.content' 2>/dev/null |
+             tr -d '\n' | base64 -d > "$KEYSTORE" &&
+             keytool -list -keystore "$KEYSTORE" -storetype JKS -storepass android -alias digiautostart >/dev/null 2>&1; then
+            echo "Reusing stable private Debug signing key."
+          else
+            rm -f "$KEYSTORE"
+            keytool -genkeypair -v -keystore "$KEYSTORE" -storetype JKS \
+              -storepass android -keypass android -alias digiautostart \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=DigiAutoStart Debug, OU=Development, O=CatharsysAmaeth, C=PT"
+            base64 -w 0 "$KEYSTORE" > "$KEY_B64"
+            EXISTING_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/signing/debug.keystore.b64?ref=main" --jq '.sha' 2>/dev/null || true)"
+            if [ -n "$EXISTING_SHA" ]; then
+              jq --rawfile content "$KEY_B64" -n --arg message "build: replace invalid Debug signing key" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
+                gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/signing/debug.keystore.b64" --input -
+            else
+              jq --rawfile content "$KEY_B64" -n --arg message "build: add stable Debug signing key" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
+                gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/signing/debug.keystore.b64" --input -
+            fi
+          fi
+
+          echo "DIGIAUTOSTART_SIGNING_STORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
           echo "DIGIAUTOSTART_SIGNING_STORE_PASSWORD=android" >> "$GITHUB_ENV"
 
       - name: Run unit tests and build debug and release APKs
