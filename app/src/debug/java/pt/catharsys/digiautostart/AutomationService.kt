@@ -191,26 +191,29 @@ class AutomationService : Service() {
         }
         try {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            val launchRequestedAt = System.currentTimeMillis()
             startActivity(launchIntent)
             DiagnosticsFeature.record(this, "automation_launch_start_activity_returned", "trigger=$reason")
-            handler.postDelayed({ verifyTargetForeground(reason) }, VERIFY_LAUNCH_DELAY_MS)
+            handler.postDelayed({ verifyTargetForeground(reason, launchRequestedAt) }, VERIFY_LAUNCH_DELAY_MS)
         } catch (error: Exception) {
             DiagnosticsFeature.record(this, "automation_launch_exception",
                 "trigger=$reason,exception=${error.javaClass.simpleName}")
         }
     }
 
-    private fun verifyTargetForeground(reason: String) {
+    private fun verifyTargetForeground(reason: String, launchRequestedAt: Long) {
         val manager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
         val end = System.currentTimeMillis()
-        val events = manager.queryEvents(end - VERIFY_LOOKBACK_MS, end) ?: return
+        val events = manager.queryEvents(launchRequestedAt, end) ?: return
         val event = UsageEvents.Event()
         var targetResumed = false
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             if ((event.eventType == UsageEvents.Event.ACTIVITY_RESUMED ||
                     event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) &&
-                event.packageName == TARGET_PACKAGE) targetResumed = true
+                event.packageName == TARGET_PACKAGE && event.timeStamp >= launchRequestedAt) {
+                targetResumed = true
+            }
         }
         DiagnosticsFeature.record(
             this,
