@@ -62,11 +62,7 @@ class MainActivity : Activity() {
         }
         content.addView(status, margin(bottom = 20))
 
-        if (BuildConfig.DEBUG) {
-            content.addView(button("Configurar") { AutomationFeature.configure(this) { refreshStatus() } }, margin(bottom = 12))
-            content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
-            content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
-        }
+        DebugMenuFeature.addButtons(this, content) { refreshStatus() }
 
         content.addView(text("Sobre o DAdA", 20f, true).apply { setTextColor(0xFFFFFFFF.toInt()) }, margin(bottom = 8))
         content.addView(text(
