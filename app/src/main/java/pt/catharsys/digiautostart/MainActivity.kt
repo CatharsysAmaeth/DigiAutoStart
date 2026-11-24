@@ -28,7 +28,7 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        DiagnosticsFeature.attach(this)
+        DiagnosticsFeature.attach(applicationContext)
         DiagnosticsFeature.record(this, "activity_started")
     }
 
@@ -45,7 +45,6 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         DiagnosticsFeature.record(this, "activity_stopped")
-        DiagnosticsFeature.detach(this)
         super.onStop()
     }
 

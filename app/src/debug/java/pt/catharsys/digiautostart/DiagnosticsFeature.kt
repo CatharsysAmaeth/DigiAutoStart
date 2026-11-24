@@ -45,10 +45,10 @@ object DiagnosticsFeature {
         }
         receiver = instance
         if (Build.VERSION.SDK_INT >= 33) {
-            context.registerReceiver(instance, filter, Context.RECEIVER_NOT_EXPORTED)
+            context.applicationContext.registerReceiver(instance, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
-            context.registerReceiver(instance, filter)
+            context.applicationContext.registerReceiver(instance, filter)
         }
         record(context, "screen_receiver_attached")
     }
@@ -56,7 +56,7 @@ object DiagnosticsFeature {
     fun detach(context: Context) {
         val current = receiver ?: return
         try {
-            context.unregisterReceiver(current)
+            context.applicationContext.unregisterReceiver(current)
         } catch (_: IllegalArgumentException) {
         }
         receiver = null
@@ -93,7 +93,7 @@ object DiagnosticsFeature {
                         activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                             .edit().putBoolean("enabled", enabled).apply()
                         record(activity, if (enabled) "capture_started" else "capture_stopped")
-                        if (enabled) attach(activity) else detach(activity)
+                        if (enabled) attach(activity.applicationContext) else detach(activity.applicationContext)
                         Toast.makeText(activity, if (enabled) "Recolha iniciada." else "Recolha parada.", Toast.LENGTH_SHORT).show()
                     }
                     1 -> askPasswordAndExport(activity)
