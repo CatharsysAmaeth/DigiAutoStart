@@ -7,7 +7,9 @@
 
     <application
         android:allowBackup="false"
-        android:label="DigiAutoStart"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="DAdA"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
