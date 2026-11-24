@@ -50,5 +50,5 @@ jobs:
           name: "DigiAutoStart ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
-            DigiAutoStart-${{ github.ref_name }}-normal-unsigned.apk
+            DigiAutoStart-${{ github.ref_name }}-normal.apk
             DigiAutoStart-${{ github.ref_name }}-debug.apk
