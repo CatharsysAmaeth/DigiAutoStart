@@ -12,18 +12,20 @@ class AutomationBootReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences("digi_autostart", Context.MODE_PRIVATE)
         val enabled = prefs.getBoolean("automation_enabled", false)
-        if (!enabled) {
-            DiagnosticsFeature.record(context, "automation_boot_ignored", "reason=automation_disabled")
+        val launchOnBoot = intent.action == Intent.ACTION_BOOT_COMPLETED &&
+            prefs.getBoolean("launch_digi_on_boot", false)
+        if (!enabled && !launchOnBoot) {
+            DiagnosticsFeature.record(context, "automation_boot_ignored",
+                "reason=monitor_and_boot_launch_disabled")
             return
         }
 
-        val launchOnBoot = prefs.getBoolean("launch_digi_on_boot", false)
         try {
             AutomationService.start(context, fromBoot = true)
             DiagnosticsFeature.record(
                 context,
                 "automation_recovery_requested",
-                "reason=${intent.action},launch_on_boot=$launchOnBoot"
+                "reason=${intent.action},monitor_enabled=$enabled,launch_on_boot=$launchOnBoot"
             )
         } catch (error: Exception) {
             DiagnosticsFeature.record(
