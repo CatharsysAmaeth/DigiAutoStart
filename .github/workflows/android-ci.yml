@@ -125,8 +125,8 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
-          if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
-            echo "Unexpected diagnostics FileProvider found in Release manifest"
+          if grep -E 'androidx.core.content.FileProvider|diagnostics.files|AutomationService|AutomationBootReceiver' /tmp/release-manifest.txt; then
+            echo "Unexpected Debug-only provider or automation component found in Release manifest"
             exit 1
           fi
           while IFS= read -r dex; do
@@ -134,8 +134,8 @@ jobs:
               echo "Unexpected Zip4j classes found in Release APK"
               exit 1
             fi
-            if unzip -p "$APK" "$dex" | strings | grep -q 'DIAGNOSTICS_GITHUB_TOKEN'; then
-              echo "Unexpected private diagnostics configuration found in Release APK"
+            if unzip -p "$APK" "$dex" | strings | grep -Eq 'DIAGNOSTICS_GITHUB_TOKEN|AutomationService|AutomationBootReceiver|automation_screen_off_decision'; then
+              echo "Unexpected private diagnostics or automation code found in Release APK"
               exit 1
             fi
           done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
