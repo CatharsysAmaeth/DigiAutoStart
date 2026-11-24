@@ -202,3 +202,50 @@ jobs:
             jq --rawfile content /tmp/debug-version.base64 -n --arg message "build: add Debug version metadata" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
               gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/version.json" --input -
           fi
+
+      - name: Upload normal Release APK as a workflow artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DAdA-release-no-debug-menu
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish normal Release APK and metadata in private repository
+        if: success() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
+        env:
+          GH_TOKEN: ${{ secrets.DIAGNOSTICS_REPO_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::DIAGNOSTICS_REPO_TOKEN is required to publish the normal Release APK."
+            exit 1
+          fi
+
+          FILE="apk/DigiAutoStart-release.apk"
+          base64 -w 0 app/build/outputs/apk/release/app-release.apk > /tmp/release-apk.base64
+          EXISTING_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE?ref=main" --jq '.sha' 2>/dev/null || true)"
+          if [ -n "$EXISTING_SHA" ]; then
+            jq --rawfile content /tmp/release-apk.base64 -n --arg message "build: publish normal Release APK" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
+              gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE" --input -
+          else
+            jq --rawfile content /tmp/release-apk.base64 -n --arg message "build: publish normal Release APK" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
+              gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/$FILE" --input -
+          fi
+
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\\1/p' app/build.gradle.kts | head -n1)"
+          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\\1/p' app/build.gradle.kts | head -n1)"
+          APK_SHA256="$(sha256sum app/build/outputs/apk/release/app-release.apk | awk '{print $1}')"
+          jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \\
+            '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-release.apk",buildType:"release",debugMenu:false}' > /tmp/release-version.json
+          base64 -w 0 /tmp/release-version.json > /tmp/release-version.base64
+          VERSION_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/release-version.json?ref=main" --jq '.sha' 2>/dev/null || true)"
+          if [ -n "$VERSION_SHA" ]; then
+            jq --rawfile content /tmp/release-version.base64 -n --arg message "build: update normal Release version metadata" --arg sha "$VERSION_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
+              gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/release-version.json" --input -
+          else
+            jq --rawfile content /tmp/release-version.base64 -n --arg message "build: add normal Release version metadata" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
+              gh api --method PUT "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/release-version.json" --input -
+          fi
