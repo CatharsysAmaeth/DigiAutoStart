@@ -1,13 +1,15 @@
-# APK publishing
+# Publicação de APKs
 
-The Android CI workflow builds and tests the Debug and normal Release variants.
+O workflow de Android compila e testa as variantes Debug e Release.
 
-- The normal Release APK is published at `apk/DigiAutoStart-normal.apk` after changes are merged to `main`.
-- Release includes the user-facing configuration and tested standby/startup automation.
-- Release excludes Debug menus, diagnostic collection, private test-updater code and Debug-only network/package-install permissions.
-- Debug builds are for development and device testing; they are not presented as normal public releases.
-- Pull requests build and test both variants but do not publish the public APK.
+- O APK estável é publicado como ficheiro anexo a uma GitHub Release, depois de as alterações serem integradas na branch `main`.
+- Cada versão usa uma etiqueta própria, no formato `vX.Y.Z`, e o nome do APK inclui a versão.
+- Os APKs binários não são guardados na árvore de código do repositório público.
+- A versão Release inclui o ecrã de configuração e a automação de standby/arranque testada.
+- A versão Release exclui menus de desenvolvimento, recolha de diagnósticos, ferramentas privadas de teste e permissões de rede/instalação exclusivas de Debug.
+- As compilações Debug destinam-se ao desenvolvimento e a testes no equipamento; não são publicadas como versões estáveis.
+- Os pedidos de integração compilam e testam ambas as variantes, mas não publicam uma versão.
 
-The workflow checks the contents of the Release manifest and DEX files: automation must be present, while private diagnostics and Debug-only tools must be absent.
+O workflow verifica o manifesto e os ficheiros DEX da Release: a automação tem de estar presente e os diagnósticos privados e ferramentas de Debug têm de estar ausentes.
 
-Signing material and credentials are kept outside the public source tree in protected CI configuration. Never commit a keystore, private key, password, token or credential.
+O material de assinatura e as credenciais são mantidos fora do código público, em configuração protegida do CI. Nunca incluir num commit um keystore, chave privada, palavra-passe, token ou credencial.
