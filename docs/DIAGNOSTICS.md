@@ -1,53 +1,32 @@
 # Debug diagnostics
 
-## Scope
+Diagnostics are Debug-only and opt-in. They capture DigiAutoStart lifecycle events, screen broadcasts and the automation service's own decisions and launch outcomes.
 
-The diagnostics implementation is deliberately isolated under `src/debug`.
-The Release variant receives only a no-op API shim under `src/release`, has
-no diagnostics UI, no diagnostic receiver, no INTERNET permission and no
-ZIP-encryption or upload dependencies.
+## Automation events
 
-The Debug build records only app-owned lifecycle/launch events and the
-ACTION_SCREEN_ON / ACTION_SCREEN_OFF broadcasts observed while the app process
-is alive. A received screen broadcast is recorded as an observation; it is
-not proof that the device entered or left standby.
+- Service start, destruction and screen receiver registration.
+- SCREEN_OFF decision: selected mode and whether DIGI TV was the last foreground user app.
+- Missing Usage Access.
+- SCREEN_ON decision and scheduled delay.
+- Launch blocked, missing launch intent, exception, or startActivity call returned.
 
-## Privacy and retention
+The implementation does not export a general app-usage history. Mode B reads UsageEvents transiently and records only whether DIGI TV matched the last foreground user app.
 
-- Capture is opt-in and starts only when the user selects "Iniciar recolha".
-- The log is bounded to approximately 1 MiB, with one previous segment.
-- No serial number, MAC address, IP address, SSID, account information,
-  credentials, DIGI TV content or broad app-usage history is collected.
-- Device summary contains Android version, manufacturer/model and app version.
-- "Apagar registos" deletes the current and previous event logs.
-- The password is entered at export time and is not saved by the app.
-- Export uses ZIP AES-256 encryption. The password is not embedded in this
-  public repository or in the APK source.
-- The ZIP contains the current and previous log segment, when present.
+## Runtime architecture
 
-## Private GitHub upload
+The Debug foreground service keeps the dynamic screen receiver alive while the Activity is stopped. It uses START_STICKY and a BOOT_COMPLETED receiver to request recovery after process reclamation and device reboot. A persistent notification is displayed while enabled.
 
-The Debug build can upload the latest encrypted ZIP to
-`CatharsysAmaeth/DigiAutoStart-Diagnostics`, under `reports/`.
+## Permissions
 
-The user must create a GitHub fine-grained personal access token with:
-- Resource owner: `CatharsysAmaeth`
-- Repository access: only `DigiAutoStart-Diagnostics`
-- Repository permissions: `Contents: Read and write`
-- An expiry date (prefer a short lifetime, e.g. 30 days).
+- Usage Access: Mode B only.
+- Display over other apps: Android background-activity-launch exemption.
+- Foreground service and boot completed: keep and restore the receiver.
+- Internet, FileProvider and package-install permission: Debug diagnostics/update flow.
 
-The token is entered in the Debug app, encrypted at rest using an
-Android Keystore AES-GCM key, and never included in logs or reports. The app
-uses it only for the private repository API. Revoking the token in GitHub
-immediately disables future uploads. Clearing app data removes the encrypted
-token; uninstalling the app removes the app's Keystore key.
+These permissions and components are absent from Release. No root, accessibility service, overlay window, bootloader or firmware modification is used.
 
-Only the already AES-256-encrypted ZIP is uploaded. The GitHub repository
-therefore stores ciphertext, not readable diagnostic content. The ZIP
-password is separate from the GitHub token.
+## Privacy
 
-## Limitations
-
-Screen broadcasts are observations, not proof of standby/wake. No automatic
-standby detection or DIGI TV relaunch is implemented yet. No Usage Access,
-Accessibility, overlay, root, bootloader or firmware permissions are requested.
+- Capture is opt-in and bounded to approximately 1 MiB plus one previous segment.
+- No serial number, MAC address, IP address, SSID, account information, credentials or DIGI TV content is collected.
+- Reports are AES-256 encrypted and uploaded to the private diagnostics repository.

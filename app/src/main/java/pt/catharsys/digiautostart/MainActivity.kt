@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         DiagnosticsFeature.attach(applicationContext)
+        AutomationFeature.startIfEnabled(applicationContext)
         DiagnosticsFeature.record(this, "activity_started")
     }
 
@@ -58,7 +59,8 @@ class MainActivity : Activity() {
         content.addView(text("DigiAutoStart", 30f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         })
-        content.addView(text("DIGI TV • Assistente de arranque", 16f).apply {
+        val buildLabel = "${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEBUG) " • DEBUG" else ""
+        content.addView(text("DIGI TV • Assistente de arranque • $buildLabel", 14f).apply {
             setTextColor(0xFFB8C7D1.toInt())
         }, margin(top = 4, bottom = 20))
 
@@ -109,6 +111,7 @@ class MainActivity : Activity() {
         content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 20))
 
         if (BuildConfig.DEBUG) {
+            content.addView(button("Configurar automação (teste)") { AutomationFeature.configure(this) }, margin(bottom = 12))
             content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
             content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
         }
@@ -117,7 +120,7 @@ class MainActivity : Activity() {
             setTextColor(0xFFFFFFFF.toInt())
         }, margin(bottom = 8))
         content.addView(text(
-            "Esta versão permite testar a instalação, a interface, as preferências e a abertura manual da DIGI TV. A deteção de standby/retoma e o arranque automático ainda não estão ativos. As opções de modo e atraso ficam guardadas para a fase seguinte.",
+            "Esta versão inclui automação experimental: um serviço em primeiro plano mantém a deteção de standby/retoma ativa, tenta abrir a DIGI TV segundo o modo escolhido e solicita recuperação após reinício da box. Configura-a em «Configurar automação (teste)». O comportamento ainda precisa de validação nesta box.",
             16f
         ).apply { setTextColor(0xFFD2DCE2.toInt()) }, margin(bottom = 14))
 

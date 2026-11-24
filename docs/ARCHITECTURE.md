@@ -2,50 +2,41 @@
 
 ## Goal
 
-A native Android application that detects the relevant return from standby
-and attempts to reopen the DIGI TV application under Android platform rules.
+Automatically reopen DIGI TV after the DIGI R1A wakes from standby, while preserving the original Google TV launcher, Widevine L1 and device certification.
 
-## Implemented in version 0.1.0
+## Implemented in Debug 0.5.0
 
-1. **TV interface**
-   - Native Android Activity with remote-friendly focusable controls.
-   - Saved Mode A / Mode B preference.
-   - Saved intended launch delay (0–30 seconds).
-   - Current DIGI TV launch-activity availability status.
-   - Manual launch button.
-2. **Launch policy**
-   - Pure decision function for Mode A and Mode B.
-   - Unit tests for the two decision paths.
+- TV-friendly controls for Mode A (always) and Mode B (only if DIGI TV was the last user app), plus a 0–30 second delay.
+- Dynamic SCREEN_OFF / SCREEN_ON receiver owned by a foreground service.
+- Mode B reads Usage Access events and ignores DigiAutoStart, the Home launcher and System UI when determining the last foreground app.
+- Foreground service with a persistent low-importance notification keeps the receiver registered when the Activity is stopped.
+- START_STICKY allows Android to recreate the service after process reclamation.
+- BOOT_COMPLETED receiver requests service restart after device reboot when the user previously enabled automation.
+- Background Activity launch is attempted only with the user's special Display over other apps access.
+- Opt-in diagnostics record decisions and launch outcomes.
 
-The mode and delay controls currently store preferences only. They do not
-trigger automation in this version.
+## Runtime requirements
 
-## Planned components
+- User must enable the feature explicitly from DigiAutoStart while its Activity is visible.
+- Mode A requires Display over other apps access.
+- Mode B additionally requires Usage Access.
+- A persistent service notification remains visible while automation is enabled; it includes a stop action.
+- Android may still terminate or restrict services on vendor firmware. The foreground service and boot restart improve continuity but do not prove survival on every firmware.
+- The Android 12 DIGI R1A must confirm whether its firmware permits the background launch exemption. A successful startActivity call is not proof that DIGI TV became visible.
 
-1. **Foreground app tracking**
-   - Investigate Usage Access for determining the last foreground app.
-   - Request only permissions demonstrated to be necessary.
-2. **Standby / wake detection**
-   - Investigate lifecycle events and broadcasts available to ordinary apps.
-   - Validate actual behavior on the DIGI R1A firmware.
-3. **Launch controller**
-   - Resolve the DIGI TV launch intent dynamically from package
-     `ro.digionline.tv`.
-   - Handle missing or disabled target applications gracefully.
-   - Respect Android background activity launch restrictions.
-4. **Diagnostics**
-   - Record detection events, decisions, launch attempts and failures.
-   - Avoid collecting unrelated personal data.
+## Release isolation
 
-## Important limitation
+All automation code, special permissions, service, boot receiver, diagnostics and updater are Debug-only. Release retains only the manual launch and settings UI until the prototype passes physical-device testing.
 
-Android may restrict background applications from starting activities.
-The actual feasibility of automatic launch must be established on the
-DIGI R1A firmware. No behavior is considered validated before device tests.
+## Certification constraints
 
-## Launcher and certification
+No root, bootloader unlock, custom firmware, launcher replacement or protected system partition changes are used. Widevine L1 and Google TV certification remain mandatory acceptance checks.
 
-The original Android TV / Google TV launcher remains unchanged. The app does
-not request root, unlock the bootloader, modify firmware or touch protected
-system partitions. Widevine L1 and Google TV certification remain mandatory
-device acceptance checks.
+
+## Prototype 0.5.2 — boot behavior and launch verification
+
+- The boot receiver and foreground monitor are separate from opening DIGI TV. When automation is enabled, the monitor restarts after `BOOT_COMPLETED`.
+- New preference `launch_digi_on_boot` is independent of Mode A/B and defaults to `false`. If enabled, the service attempts to open DIGI TV 15 seconds after boot.
+- Mode B remains unchanged: it decides whether to launch on SCREEN_ON based on the last foreground user application before SCREEN_OFF.
+- Each automated launch now gets a follow-up Usage Access check. Diagnostics distinguish `automation_launch_start_activity_returned` from `automation_launch_foreground_observed` and `automation_launch_foreground_not_observed`. This avoids treating a non-throwing `startActivity()` call as proof that DIGI TV appeared.
+- Analysis of the 2026-11-24 20:05:43Z report confirmed `BOOT_COMPLETED`, service restart and receiver registration. The previous build did not have a boot-launch preference, so remaining on the launcher immediately after reboot was expected. See the private diagnostics repository for the detailed timeline.

@@ -30,7 +30,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -63,7 +63,7 @@ jobs:
           gradle-version: "8.13"
 
       - name: Prepare stable Debug signing key
-        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.DIAGNOSTICS_REPO_TOKEN }}
         shell: bash
@@ -109,6 +109,15 @@ jobs:
           export DIAGNOSTICS_ZIP_PASSWORD_B64="$(printf '%s' "$DIAGNOSTICS_ZIP_PASSWORD" | base64 -w 0)"
           gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug assembleRelease
 
+      - name: Upload signed Debug prototype APK for device testing
+        if: success() && github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/feature/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: DigiAutoStart-debug-standby-prototype
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify diagnostics and private updater are absent from Release APK
         shell: bash
         run: |
@@ -116,8 +125,8 @@ jobs:
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
-          if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
-            echo "Unexpected diagnostics FileProvider found in Release manifest"
+          if grep -E 'androidx.core.content.FileProvider|diagnostics.files|AutomationService|AutomationBootReceiver' /tmp/release-manifest.txt; then
+            echo "Unexpected Debug-only provider or automation component found in Release manifest"
             exit 1
           fi
           while IFS= read -r dex; do
@@ -125,8 +134,8 @@ jobs:
               echo "Unexpected Zip4j classes found in Release APK"
               exit 1
             fi
-            if unzip -p "$APK" "$dex" | strings | grep -q 'DIAGNOSTICS_GITHUB_TOKEN'; then
-              echo "Unexpected private diagnostics configuration found in Release APK"
+            if unzip -p "$APK" "$dex" | strings | grep -Eq 'DIAGNOSTICS_GITHUB_TOKEN|AutomationService|AutomationBootReceiver|automation_screen_off_decision'; then
+              echo "Unexpected private diagnostics or automation code found in Release APK"
               exit 1
             fi
           done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
@@ -134,7 +143,7 @@ jobs:
             echo "Unexpected Debug UI string found in Release APK"
             exit 1
           fi
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE|android.permission.INTERNET|REQUEST_INSTALL_PACKAGES'; then
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE|android.permission.INTERNET|REQUEST_INSTALL_PACKAGES|FOREGROUND_SERVICE|RECEIVE_BOOT_COMPLETED'; then
             echo "Unexpected sensitive permission found in Release APK"
             exit 1
           fi
@@ -157,7 +166,7 @@ jobs:
           fi
 
       - name: Publish Debug APK and version metadata in private repository
-        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: success() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
         env:
           GH_TOKEN: ${{ secrets.DIAGNOSTICS_REPO_TOKEN }}
         shell: bash
