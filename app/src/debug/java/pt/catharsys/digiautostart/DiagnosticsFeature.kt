@@ -30,7 +30,7 @@ import java.util.Locale
 object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
-    private const val TARGET_PACKAGE = "ro.digionline.tv"
+    
     private const val GITHUB_OWNER = "CatharsysAmaeth"
     private const val GITHUB_REPO = "DigiAutoStart-Diagnostics"
     private var receiver: BroadcastReceiver? = null
