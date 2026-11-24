@@ -62,7 +62,7 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Prepare stable Debug signing key
+      - name: Prepare stable application signing key
         if: success() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.DIAGNOSTICS_REPO_TOKEN }}
@@ -118,35 +118,43 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Verify diagnostics and private updater are absent from Release APK
+      - name: Verify Release automation is present and Debug features are absent
         shell: bash
         run: |
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
           test -f "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
-          if grep -E 'androidx.core.content.FileProvider|diagnostics.files|AutomationService|AutomationBootReceiver' /tmp/release-manifest.txt; then
-            echo "Unexpected Debug-only provider or automation component found in Release manifest"
+
+          # The production app must contain the automation components and required permissions.
+          grep -Fq '.AutomationService' /tmp/release-manifest.txt
+          grep -Fq '.AutomationBootReceiver' /tmp/release-manifest.txt
+          for permission in SYSTEM_ALERT_WINDOW PACKAGE_USAGE_STATS FOREGROUND_SERVICE RECEIVE_BOOT_COMPLETED; do
+            grep -Fq "android.permission.$permission" /tmp/release-manifest.txt
+          done
+
+          # Private diagnostics, file sharing, updater and Debug-only network/install access must be absent.
+          if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
+            echo "Unexpected diagnostics FileProvider found in Release manifest"
             exit 1
           fi
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" |
+             grep -Ei 'android.permission.INTERNET|android.permission.REQUEST_INSTALL_PACKAGES|BIND_ACCESSIBILITY_SERVICE'; then
+            echo "Unexpected Debug-only network, package-install or accessibility permission found in Release"
+            exit 1
+          fi
+
           while IFS= read -r dex; do
-            if unzip -p "$APK" "$dex" | strings | grep -q 'net/lingala/zip4j'; then
-              echo "Unexpected Zip4j classes found in Release APK"
+            DEX_STRINGS="$(unzip -p "$APK" "$dex" | strings)"
+            if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DIAGNOSTICS_GITHUB_TOKEN|DIAGNOSTICS_ZIP_PASSWORD|DigiAutoStart-Diagnostics|Diagnósticos \(Debug\)|Verificar atualizações'; then
+              echo "Unexpected private diagnostics or Debug updater code found in Release APK"
               exit 1
             fi
-            if unzip -p "$APK" "$dex" | strings | grep -Eq 'DIAGNOSTICS_GITHUB_TOKEN|AutomationService|AutomationBootReceiver|automation_screen_off_decision'; then
-              echo "Unexpected private diagnostics or automation code found in Release APK"
+            if ! printf '%s' "$DEX_STRINGS" | grep -q 'automation_screen_off_decision'; then
+              echo "Standby automation implementation is missing from Release APK"
               exit 1
             fi
-          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
-          if unzip -p "$APK" classes.dex | strings | grep -E 'Diagnósticos \(Debug\)|Verificar atualizações'; then
-            echo "Unexpected Debug UI string found in Release APK"
-            exit 1
-          fi
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE|android.permission.INTERNET|REQUEST_INSTALL_PACKAGES|FOREGROUND_SERVICE|RECEIVE_BOOT_COMPLETED'; then
-            echo "Unexpected sensitive permission found in Release APK"
-            exit 1
-          fi
+          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$')
 
       - name: Publish normal APK in public repository
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -239,7 +247,7 @@ jobs:
           VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
           APK_SHA256="$(sha256sum app/build/outputs/apk/release/app-release.apk | awk '{print $1}')"
           jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
-            '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-release.apk",buildType:"release",debugMenu:false}' > /tmp/release-version.json
+            '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-release.apk",buildType:"release",debugMenu:false,automation:true,diagnostics:false,privateUpdater:false}' > /tmp/release-version.json
           base64 -w 0 /tmp/release-version.json > /tmp/release-version.base64
           VERSION_SHA="$(gh api "repos/CatharsysAmaeth/DigiAutoStart-Diagnostics/contents/apk/release-version.json?ref=main" --jq '.sha' 2>/dev/null || true)"
           if [ -n "$VERSION_SHA" ]; then
