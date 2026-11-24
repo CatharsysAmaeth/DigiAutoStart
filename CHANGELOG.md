@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.3 — DAdA branding and clearer startup controls
+
+- Rename the app shown on Android TV to DAdA.
+- Use the product subtitle “DIGI TV · Assistente de arranque”.
+- Add a blue Android TV adaptive launcher icon.
+- Make the automation entry point explicit on the main screen.
+- Clarify the independent option to open DIGI TV when the box starts.
+
+## 0.5.2 — boot behavior and launch verification
+
+- Add optional DIGI TV launch at box startup, disabled by default and independent of Mode B.
+- Keep the foreground monitor restart at boot whenever automation is enabled.
+- Verify whether DIGI TV actually becomes foreground after automated launch attempts; record observed/not-observed outcomes.
+- Keep visible app version and DEBUG marker.
+
 ## 0.5.0 — persistent standby automation prototype
 
 - Added Debug foreground service to keep SCREEN_OFF / SCREEN_ON receiver registered outside the Activity.
@@ -27,11 +42,3 @@
 ## 0.1.0 — initial device-test build
 
 - Added TV-friendly interface, preferences and manual DIGI TV launch.
-
-
-## 0.5.2 — in progress
-
-- Add optional DIGI TV launch at box startup, disabled by default and independent of Mode B.
-- Keep the foreground monitor restart at boot whenever automation is enabled.
-- Verify whether DIGI TV actually becomes foreground after automated launch attempts; record observed/not-observed outcomes.
-- Keep visible app version and DEBUG marker.
