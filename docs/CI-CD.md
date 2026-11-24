@@ -2,8 +2,7 @@
 
 ## Goals
 
-Build and test Android code on GitHub-hosted runners without requiring the
-developer Mac to compile the application.
+Build and test the Android application on repeatable GitHub-hosted runners.
 
 ## Android CI workflow
 
@@ -14,50 +13,30 @@ Triggers:
 - Pull requests targeting `main`.
 - Manual execution through `workflow_dispatch`.
 
-Runner:
-- GitHub-hosted `ubuntu-latest`.
+Build environment:
+- GitHub-hosted Ubuntu runner.
 - Temurin JDK 21.
 - Android SDK Platform 36 and Build Tools 36.0.0.
-- Gradle 8.13 installed by Gradle Actions.
+- Gradle 8.13.
 
-The workflow runs:
-1. Android SDK setup.
-2. Gradle dependency caching.
-3. `testDebugUnitTest`.
-4. `assembleDebug`.
-5. Uploads the debug APK as a 14-day workflow artifact.
+The workflow:
+1. Runs unit tests.
+2. Builds Debug and normal Release APKs.
+3. Checks that Release contains the standby/startup automation and required permissions.
+4. Checks that Release excludes private diagnostics, the test updater and Debug-only network/package-install permissions.
+5. Publishes the normal APK only from `main`; pull requests do not publish it.
 
-A successful CI build proves that the APK compiles and unit tests pass. It
-does not prove compatibility with the DIGI R1A firmware.
+A successful CI build proves that compilation, unit tests and APK-content checks passed. It does not replace physical-device validation of standby/wake behavior.
 
-## APK artifact
+## Signing and updates
 
-The debug APK is intended for installation tests. It is unsigned with a
-production key (Gradle debug builds use the standard debug signing config).
-It is not a production release.
-
-## Production signing and releases
-
-Production signing is deliberately deferred.
-
-Before enabling signed releases:
-- Confirm the permanent Android application ID.
-- Generate the production signing key in a trusted environment.
-- Keep the keystore and passwords out of Git.
-- Store signing material only in protected GitHub Secrets / Environment.
-- Maintain a secure offline backup of the signing key.
-- Add a tag-triggered release workflow only after signing is tested.
-
-Never commit a keystore, private key, password, token or credential.
+Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material is kept outside the public repository in protected CI storage. Never commit signing material or passwords.
 
 ## Device testing boundary
 
-GitHub-hosted runners cannot validate standby/wake behavior or DRM state on
-the physical DIGI R1A. Those checks remain device acceptance tests.
-Widevine L1 and Google / Android TV certification must not be put at risk.
+Standby/wake behavior and DRM certification must be checked on physical Android TV hardware. GitHub-hosted runners cannot validate firmware behavior or Widevine state.
 
 ## Security
 
-- Workflows use read-only repository permissions.
 - Do not expose secrets to pull-request code from untrusted forks.
-- Keep build logs and artifacts free of credentials and personal data.
+- Keep credentials, signing material, diagnostic reports and personal/device data out of public source and build logs.
