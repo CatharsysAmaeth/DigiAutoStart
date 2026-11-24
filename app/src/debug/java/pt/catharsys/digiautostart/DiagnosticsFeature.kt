@@ -31,8 +31,6 @@ object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
     
-    private const val GITHUB_OWNER = "CatharsysAmaeth"
-    private const val GITHUB_REPO = "DigiAutoStart-Diagnostics"
     private var receiver: BroadcastReceiver? = null
 
     fun attach(context: Context) {
@@ -116,10 +114,11 @@ object DiagnosticsFeature {
             Toast.makeText(activity, "Ainda não existem eventos. Inicia a recolha e reproduz o problema.", Toast.LENGTH_LONG).show()
             return
         }
-        val token = secret(BuildConfig.DIAGNOSTICS_GITHUB_TOKEN_B64)
-        val password = secret(BuildConfig.DIAGNOSTICS_ZIP_PASSWORD_B64)
-        if (token.isBlank() || password.isBlank()) {
-            Toast.makeText(activity, "A configuração privada desta compilação está incompleta.", Toast.LENGTH_LONG).show()
+        val token = secret(BuildConfig.DADA_PRIVATE_TOKEN_B64)
+        val password = secret(BuildConfig.DADA_DEBUG_REPORT_PASSWORD_B64)
+        val repository = secret(BuildConfig.DADA_PRIVATE_REPOSITORY_B64)
+        if (token.isBlank() || password.isBlank() || !repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) {
+            Toast.makeText(activity, "A configuração do canal interno desta compilação está incompleta.", Toast.LENGTH_LONG).show()
             return
         }
 
@@ -154,10 +153,10 @@ object DiagnosticsFeature {
                     .put("message", "Add encrypted DigiAutoStart diagnostic report")
                     .put("content", encoded)
                     .toString()
-                val endpoint = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/contents/reports/${zip.name}"
+                val endpoint = "https://api.github.com/repos/$repository/contents/reports/${zip.name}"
                 val status = githubRequest(token, endpoint, body)
                 if (status !in 200..299) error("GitHub HTTP $status")
-                "Relatório enviado com sucesso para o repositório privado."
+                "Relatório enviado com sucesso para o canal interno."
             } catch (error: Exception) {
                 "Falha ao enviar relatório: ${error.message ?: error.javaClass.simpleName}"
             }
