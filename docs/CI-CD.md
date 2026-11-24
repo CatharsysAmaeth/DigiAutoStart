@@ -32,6 +32,16 @@ A successful CI build proves that compilation, unit tests and APK-content checks
 
 Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material and internal distribution settings are kept outside the public source tree in protected CI secrets. Never commit signing material or passwords.
 
+## Protected CI configuration
+
+Maintainer pushes use these GitHub Actions secrets; none of their values belong in tracked files:
+
+- `DADA_PRIVATE_REPOSITORY`: internal destination in `owner/repository` form.
+- `DADA_PRIVATE_TOKEN`: token with the minimum required contents read/write access to that destination.
+- `DADA_DEBUG_REPORT_PASSWORD`: password used to encrypt opt-in Debug reports.
+
+Pull-request builds do not receive these secrets and do not publish internal artifacts. The Debug APK is not uploaded as a public Actions artifact.
+
 ## Device testing boundary
 
 Standby/wake behavior and DRM certification must be checked on physical Android TV hardware. GitHub-hosted runners cannot validate firmware behavior or Widevine state.
