@@ -6,5 +6,6 @@ import android.content.Context
 /** No-op implementation: experimental standby automation is Debug-only. */
 object AutomationFeature {
     fun attach(context: Context) = Unit
+    fun startIfEnabled(context: Context) = Unit
     fun configure(activity: Activity) = Unit
 }
