@@ -1,19 +1,19 @@
 # Changelog
 
-All notable project changes are documented here.
+## 0.5.0 — persistent standby automation prototype
 
-## Unreleased
+- Added Debug foreground service to keep SCREEN_OFF / SCREEN_ON receiver registered outside the Activity.
+- Added sticky service restart and BOOT_COMPLETED recovery when automation is enabled.
+- Added notification with explicit stop action.
+- Implemented Mode A and Mode B last-foreground-app decision, with Home/System UI excluded.
+- Restored Debug package-install permission required by the private APK updater.
+- Kept automation components and permissions out of Release.
 
-- Validate the Debug-only standby/wake automation prototype on the DIGI R1A.
-- Determine whether a persistent process strategy is necessary.
+## 0.4.0 — initial standby automation prototype
 
-## 0.4.0 — experimental standby automation
-
-- Added Debug-only dynamic SCREEN_OFF / SCREEN_ON automation receiver.
-- Added Mode A wake scheduling and Mode B last-foreground-app detection via Usage Access.
-- Added explicit setup for Android background-launch overlay exemption.
-- Added diagnostic decision and launch outcome events.
-- Kept automation permissions and UI out of Release.
+- Added Debug-only dynamic screen receiver, launch decision and diagnostics.
+- Added Mode A wake scheduling and Mode B Usage Access lookup.
+- Added setup for Android background-launch exemption.
 
 ## 0.3.0 — private Debug updater
 
@@ -26,4 +26,4 @@ All notable project changes are documented here.
 
 ## 0.1.0 — initial device-test build
 
-- Scope: installation, interface, preferences and manual DIGI TV launch.
+- Added TV-friendly interface, preferences and manual DIGI TV launch.
