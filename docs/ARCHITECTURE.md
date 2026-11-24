@@ -31,3 +31,12 @@ All automation code, special permissions, service, boot receiver, diagnostics an
 ## Certification constraints
 
 No root, bootloader unlock, custom firmware, launcher replacement or protected system partition changes are used. Widevine L1 and Google TV certification remain mandatory acceptance checks.
+
+
+## Prototype 0.5.2 — boot behavior and launch verification
+
+- The boot receiver and foreground monitor are separate from opening DIGI TV. When automation is enabled, the monitor restarts after `BOOT_COMPLETED`.
+- New preference `launch_digi_on_boot` is independent of Mode A/B and defaults to `false`. If enabled, the service attempts to open DIGI TV 15 seconds after boot.
+- Mode B remains unchanged: it decides whether to launch on SCREEN_ON based on the last foreground user application before SCREEN_OFF.
+- Each automated launch now gets a follow-up Usage Access check. Diagnostics distinguish `automation_launch_start_activity_returned` from `automation_launch_foreground_observed` and `automation_launch_foreground_not_observed`. This avoids treating a non-throwing `startActivity()` call as proof that DIGI TV appeared.
+- Analysis of the 2026-11-24 20:05:43Z report confirmed `BOOT_COMPLETED`, service restart and receiver registration. The previous build did not have a boot-launch preference, so remaining on the launcher immediately after reboot was expected. See the private diagnostics repository for the detailed timeline.
