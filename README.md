@@ -3,6 +3,26 @@
 Native Android application for testing DIGI TV launch behavior on the DIGI R1A
 Android TV box and, after device validation, automating reopening after standby.
 
+## APK downloads
+
+The latest successful build on `main` publishes the standalone APKs directly
+into the repositories (not as Actions artifacts or GitHub Releases):
+
+- **Normal APK (public):** [apk/DigiAutoStart-normal.apk](apk/DigiAutoStart-normal.apk)
+- **Debug APK (private):** stored in
+  [DigiAutoStart-Diagnostics/apk](https://github.com/CatharsysAmaeth/DigiAutoStart-Diagnostics/tree/main/apk)
+
+The normal APK is committed automatically after tests and Release-isolation
+checks pass. The Debug APK is published to the private repository when the
+`DIAGNOSTICS_REPO_TOKEN` Actions secret is configured in this repository.
+
+To configure private publication, create a fine-grained GitHub token for owner
+`CatharsysAmaeth`, restrict repository access to **DigiAutoStart-Diagnostics**
+only, grant **Contents: Read and write**, and add it in this repository under
+Settings → Secrets and variables → Actions as `DIAGNOSTICS_REPO_TOKEN`.
+The same narrowly scoped token can also be entered in the Debug app when
+configuring encrypted diagnostic uploads. Never commit the token.
+
 ## Current test build
 
 Version: **0.2.0 (debug diagnostics)**
