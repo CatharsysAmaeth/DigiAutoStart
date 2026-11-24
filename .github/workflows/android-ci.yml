@@ -69,7 +69,7 @@ jobs:
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           test -f "$APK"
-          aapt dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
           if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
             echo "Unexpected diagnostics FileProvider found in Release manifest"
             exit 1
@@ -80,7 +80,7 @@ jobs:
               exit 1
             fi
           done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
-          if aapt dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
             echo "Unexpected sensitive permission found in Release APK"
             exit 1
           fi

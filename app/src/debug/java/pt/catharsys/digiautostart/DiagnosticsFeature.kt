@@ -8,7 +8,17 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
-import android.provider.Settings
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import android.widget.EditText
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -30,6 +40,10 @@ object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
     private const val TARGET_PACKAGE = "ro.digionline.tv"
+    private const val GITHUB_OWNER = "CatharsysAmaeth"
+    private const val GITHUB_REPO = "DigiAutoStart-Diagnostics"
+    private const val TOKEN_ALIAS = "DigiAutoStartDiagnosticsUpload"
+    private const val TOKEN_PREF = "encrypted_github_token"
     private var receiver: BroadcastReceiver? = null
 
     fun attach(context: Context) {
@@ -82,6 +96,8 @@ object DiagnosticsFeature {
         val options = arrayOf(
             if (isCapturing(activity)) "Parar recolha" else "Iniciar recolha",
             "Exportar ZIP encriptado",
+            "Configurar envio privado",
+            "Enviar último relatório",
             "Apagar registos"
         )
         AlertDialog.Builder(activity)
@@ -97,7 +113,9 @@ object DiagnosticsFeature {
                         Toast.makeText(activity, if (enabled) "Recolha iniciada." else "Recolha parada.", Toast.LENGTH_SHORT).show()
                     }
                     1 -> askPasswordAndExport(activity)
-                    2 -> {
+                    2 -> configureUpload(activity)
+                    3 -> uploadLatest(activity)
+                    4 -> {
                         logFile(activity).delete()
                         File(logFile(activity).parentFile, "events.previous.jsonl").delete()
                         Toast.makeText(activity, "Registos apagados.", Toast.LENGTH_SHORT).show()
@@ -164,6 +182,17 @@ object DiagnosticsFeature {
         }
         val zipFile = ZipFile(zip, password.toCharArray())
         zipFile.addFile(source, parameters)
+        val previous = File(source.parentFile, "events.previous.jsonl")
+        if (previous.exists() && previous.length() > 0L) {
+            val previousParameters = ZipParameters().apply {
+                fileNameInZip = "events.previous.jsonl"
+                compressionMethod = CompressionMethod.DEFLATE
+                isEncryptFiles = true
+                encryptionMethod = EncryptionMethod.AES
+                aesKeyStrength = AesKeyStrength.KEY_STRENGTH_256
+            }
+            zipFile.addFile(previous, previousParameters)
+        }
         val metadataParameters = ZipParameters().apply {
             fileNameInZip = "device-summary.txt"
             compressionMethod = CompressionMethod.DEFLATE
@@ -185,6 +214,146 @@ object DiagnosticsFeature {
         }
         activity.startActivity(Intent.createChooser(send, "Partilhar relatório encriptado"))
         record(activity, "diagnostic_export_created", "file_size=${zip.length()}")
+    }
+
+
+    private fun configureUpload(activity: Activity) {
+        val input = EditText(activity).apply {
+            hint = "GitHub fine-grained token"
+            inputType = 129
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(activity)
+            .setTitle("Acesso ao repositório privado")
+            .setMessage(
+                "Cria um Fine-grained personal access token limitado ao repositório " +
+                    "$GITHUB_OWNER/$GITHUB_REPO, com Contents: Read and write. " +
+                    "O token será cifrado com uma chave Android Keystore deste equipamento."
+            )
+            .setView(input)
+            .setPositiveButton("Guardar e validar") { _, _ ->
+                val token = input.text?.toString()?.trim().orEmpty()
+                if (!token.startsWith("github_pat_") && !token.startsWith("ghp_")) {
+                    Toast.makeText(activity, "Token GitHub inválido ou vazio.", Toast.LENGTH_LONG).show()
+                } else {
+                    try {
+                        saveToken(activity, token)
+                        runNetwork(activity, "A validar acesso ao repositório privado…") {
+                            val status = githubRequest(token, "GET", "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO", null)
+                            if (status !in 200..299) error("GitHub HTTP $status")
+                            "Acesso validado ao repositório privado."
+                        }
+                    } catch (error: Exception) {
+                        Toast.makeText(activity, "Não foi possível guardar o token: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun uploadLatest(activity: Activity) {
+        val token = try { loadToken(activity) } catch (error: Exception) {
+            Toast.makeText(activity, "Configura primeiro o acesso ao GitHub.", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (token.isNullOrBlank()) {
+            Toast.makeText(activity, "Configura primeiro o acesso ao GitHub.", Toast.LENGTH_LONG).show()
+            return
+        }
+        val directory = File(activity.cacheDir, "diagnostics")
+        val zip = directory.listFiles()
+            ?.filter { it.isFile && it.name.endsWith("-encrypted.zip") }
+            ?.maxByOrNull { it.lastModified() }
+        if (zip == null) {
+            Toast.makeText(activity, "Ainda não existe um ZIP encriptado para enviar.", Toast.LENGTH_LONG).show()
+            return
+        }
+        runNetwork(activity, "A enviar relatório encriptado para o GitHub privado…") {
+            val encoded = Base64.encodeToString(zip.readBytes(), Base64.NO_WRAP)
+            val path = "reports/${zip.name}"
+            val body = JSONObject()
+                .put("message", "Add encrypted DigiAutoStart diagnostic report")
+                .put("content", encoded)
+                .toString()
+            val url = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/contents/$path"
+            val status = githubRequest(token, "PUT", url, body)
+            if (status !in 200..299) error("GitHub HTTP $status")
+            "Relatório enviado para o repositório privado."
+        }
+    }
+
+    private fun runNetwork(activity: Activity, workingMessage: String, operation: () -> String) {
+        Toast.makeText(activity, workingMessage, Toast.LENGTH_LONG).show()
+        Thread {
+            val message = try { operation() } catch (error: Exception) {
+                "Falha no envio: ${error.message ?: error.javaClass.simpleName}"
+            }
+            activity.runOnUiThread {
+                Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+            }
+        }.start()
+    }
+
+    private fun githubRequest(token: String, method: String, endpoint: String, body: String?): Int {
+        val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = 15000
+            readTimeout = 30000
+            setRequestProperty("Accept", "application/vnd.github+json")
+            setRequestProperty("Authorization", "Bearer $token")
+            setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            setRequestProperty("User-Agent", "DigiAutoStart-Debug")
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            }
+        }
+        try {
+            if (body != null) connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            stream?.use { it.copyTo(java.io.ByteArrayOutputStream()) }
+            return status
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun saveToken(context: Context, token: String) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+        val payload = cipher.iv + encrypted
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(TOKEN_PREF, Base64.encodeToString(payload, Base64.NO_WRAP)).apply()
+    }
+
+    private fun loadToken(context: Context): String? {
+        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(TOKEN_PREF, null) ?: return null
+        val payload = Base64.decode(stored, Base64.NO_WRAP)
+        val iv = payload.copyOfRange(0, 12)
+        val encrypted = payload.copyOfRange(12, payload.size)
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
+        return String(cipher.doFinal(encrypted), Charsets.UTF_8)
+    }
+
+    private fun getOrCreateKey(): SecretKey {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (store.getKey(TOKEN_ALIAS, null) as? SecretKey)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(
+            KeyGenParameterSpec.Builder(
+                TOKEN_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setRandomizedEncryptionRequired(true)
+                .build()
+        )
+        return generator.generateKey()
     }
 
     private fun isCapturing(context: Context): Boolean =

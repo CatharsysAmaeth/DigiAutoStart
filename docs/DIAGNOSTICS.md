@@ -4,7 +4,8 @@
 
 The diagnostics implementation is deliberately isolated under `src/debug`.
 The Release variant receives only a no-op API shim under `src/release`, has
-no diagnostics UI, no diagnostic receiver and no ZIP-encryption dependencies.
+no diagnostics UI, no diagnostic receiver, no INTERNET permission and no
+ZIP-encryption or upload dependencies.
 
 The Debug build records only app-owned lifecycle/launch events and the
 ACTION_SCREEN_ON / ACTION_SCREEN_OFF broadcasts observed while the app process
@@ -22,15 +23,31 @@ not proof that the device entered or left standby.
 - The password is entered at export time and is not saved by the app.
 - Export uses ZIP AES-256 encryption. The password is not embedded in this
   public repository or in the APK source.
-- The encrypted ZIP is shared using Android's system share sheet.
+- The ZIP contains the current and previous log segment, when present.
 
-## Current limitations
+## Private GitHub upload
 
-This milestone does not upload reports to GitHub. The available GitHub
-integration can modify repository contents and pull requests, but does not
-provide the permission needed to create a private repository or configure
-repository secrets. Automatic upload will be added only after a private
-destination and a narrowly scoped upload credential are available.
+The Debug build can upload the latest encrypted ZIP to
+`CatharsysAmaeth/DigiAutoStart-Diagnostics`, under `reports/`.
 
-No standby automation is implemented. No Usage Access, Accessibility,
-overlay, root, bootloader or firmware permissions are requested.
+The user must create a GitHub fine-grained personal access token with:
+- Resource owner: `CatharsysAmaeth`
+- Repository access: only `DigiAutoStart-Diagnostics`
+- Repository permissions: `Contents: Read and write`
+- An expiry date (prefer a short lifetime, e.g. 30 days).
+
+The token is entered in the Debug app, encrypted at rest using an
+Android Keystore AES-GCM key, and never included in logs or reports. The app
+uses it only for the private repository API. Revoking the token in GitHub
+immediately disables future uploads. Clearing app data removes the encrypted
+token; uninstalling the app removes the app's Keystore key.
+
+Only the already AES-256-encrypted ZIP is uploaded. The GitHub repository
+therefore stores ciphertext, not readable diagnostic content. The ZIP
+password is separate from the GitHub token.
+
+## Limitations
+
+Screen broadcasts are observations, not proof of standby/wake. No automatic
+standby detection or DIGI TV relaunch is implemented yet. No Usage Access,
+Accessibility, overlay, root, bootloader or firmware permissions are requested.

@@ -14,6 +14,7 @@ This test build provides:
 - Detection of whether the DIGI TV launch activity is available.
 - Manual DIGI TV launch test.
 - Opt-in Debug diagnostics with bounded event capture and AES-256 encrypted ZIP export.
+- Upload of encrypted ZIP reports to the dedicated private GitHub repository.
 
 **Standby detection and automatic launching are not implemented.** Screen on/off
 broadcasts are recorded only as observations and are not proof of standby/wake.
@@ -32,5 +33,6 @@ broadcasts are recorded only as observations and are not proof of standby/wake.
 
 ## Diagnostics
 
-See [Debug diagnostics](docs/DIAGNOSTICS.md). Diagnostics exist only in Debug;
-Release contains no diagnostic UI, receiver or ZIP encryption dependency.
+See [Debug diagnostics](docs/DIAGNOSTICS.md). Diagnostics, internet permission,
+GitHub upload and ZIP encryption exist only in Debug; Release contains no
+diagnostic UI, receiver, internet permission or upload/encryption dependencies.
