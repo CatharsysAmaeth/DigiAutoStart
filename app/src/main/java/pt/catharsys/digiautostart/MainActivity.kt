@@ -63,7 +63,7 @@ class MainActivity : Activity() {
         content.addView(status, margin(bottom = 20))
 
         if (BuildConfig.DEBUG) {
-            content.addView(button("Configurar") { AutomationFeature.configure(this) }, margin(bottom = 12))
+            content.addView(button("Configurar") { AutomationFeature.configure(this) { refreshStatus() }, margin(bottom = 12))
             content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
             content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
         }
