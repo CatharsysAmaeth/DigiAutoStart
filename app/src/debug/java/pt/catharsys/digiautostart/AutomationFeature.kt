@@ -27,7 +27,6 @@ object AutomationFeature {
     fun configure(activity: Activity) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val target = TargetAppResolver.selectedPackage(activity)
-        val candidates = TargetAppResolver.candidates(activity)
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(activity, 20), dp(activity, 8), dp(activity, 20), dp(activity, 8))
