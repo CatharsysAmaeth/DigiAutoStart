@@ -43,9 +43,9 @@
 
 ## T6 — Release isolation and privacy
 
-- Confirm the normal Release has no Debug menu, diagnostic collection or private test updater.
+- Confirm the normal Release has no Debug menu, diagnostic collection or internal test-update tools.
 - Confirm Release does not request Debug-only internet or package-install permissions.
-- Confirm no device identifiers, credentials, signing material or private network details are included in public documentation.
+- Confirm no device identifiers, credentials, signing material or internal network details are included in public documentation.
 
 ## Evidence rules
 
