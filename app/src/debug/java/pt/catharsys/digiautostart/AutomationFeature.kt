@@ -13,6 +13,7 @@ import android.widget.Toast
 /** Debug-only setup UI for the foreground automation service. */
 object AutomationFeature {
     private const val PREFS = "digi_autostart"
+    private const val KEY_LAUNCH_ON_BOOT = "launch_digi_on_boot"
 
     fun configure(activity: Activity) {
         val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -20,22 +21,23 @@ object AutomationFeature {
         val mode = prefs.getInt("mode", 2)
         val overlay = Settings.canDrawOverlays(activity)
         val usage = hasUsageAccess(activity)
+        val launchOnBoot = prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
         val message = buildString {
             append("Automação: ").append(if (enabled) "ATIVA" else "desativada")
             append("\nModo: ").append(if (mode == 1) "A — abrir sempre" else "B — apenas se DIGI TV era a última aplicação")
+            append("\nAbrir DIGI TV ao iniciar a box: ").append(if (launchOnBoot) "SIM" else "não")
             append("\nMostrar sobre outras aplicações: ").append(if (overlay) "autorizado" else "por autorizar")
             if (mode != 1) append("\nAcesso às estatísticas: ").append(if (usage) "autorizado" else "por autorizar")
-            append("\n\nQuando ativa, fica um serviço em primeiro plano com uma notificação discreta. O serviço monitoriza o ecrã mesmo com esta aplicação fora de vista e tenta retomar a DIGI TV ao acordar.")
-            append("\n\nO serviço é reiniciado após o arranque da box, se a automação estiver ativa.")
+            append("\n\nO serviço de monitorização arranca com a box quando a automação está ativa. A opção de abrir a DIGI TV no arranque é independente e está desligada por defeito.")
+            append("\n\nO serviço mantém uma notificação discreta e monitoriza a saída do standby.")
         }
         val actions = mutableListOf<String>()
+        actions += if (launchOnBoot) "Desativar abertura da DIGI TV no arranque" else "Ativar abertura da DIGI TV no arranque"
         if (!overlay) actions += "Autorizar «Mostrar sobre outras aplicações»"
         if (mode != 1 && !usage) actions += "Autorizar acesso às estatísticas"
         if (!enabled) actions += "Ativar automação"
         if (enabled) actions += "Desativar automação"
 
-        // Android AlertDialog cannot display setMessage() and setItems() together.
-        // Show status first, then present the action list in a separate dialog.
         AlertDialog.Builder(activity)
             .setTitle("Automação automática")
             .setMessage(message)
@@ -44,6 +46,16 @@ object AutomationFeature {
                     .setTitle("O que pretendes fazer?")
                     .setItems(actions.toTypedArray()) { _, which ->
                         when (actions[which]) {
+                            "Ativar abertura da DIGI TV no arranque",
+                            "Desativar abertura da DIGI TV no arranque" -> {
+                                val newValue = !prefs.getBoolean(KEY_LAUNCH_ON_BOOT, false)
+                                prefs.edit().putBoolean(KEY_LAUNCH_ON_BOOT, newValue).apply()
+                                Toast.makeText(
+                                    activity,
+                                    if (newValue) "A DIGI TV será aberta no arranque da box." else "Abertura automática no arranque desativada.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
                             "Autorizar «Mostrar sobre outras aplicações»" ->
                                 activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                     Uri.parse("package:${activity.packageName}")))
@@ -66,7 +78,8 @@ object AutomationFeature {
                                 }
                             }
                             "Desativar automação" -> {
-                                prefs.edit().putBoolean("automation_enabled", false).putBoolean("wake_should_launch", false).apply()
+                                prefs.edit().putBoolean("automation_enabled", false)
+                                    .putBoolean("wake_should_launch", false).apply()
                                 AutomationService.stop(activity)
                                 Toast.makeText(activity, "Automação desativada.", Toast.LENGTH_SHORT).show()
                             }
