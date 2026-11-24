@@ -2,50 +2,33 @@
 
 ## Goal
 
-A native Android application that detects the relevant return from standby
-and attempts to reopen the DIGI TV application under Android platform rules.
+A native Android application that detects return from standby and attempts to reopen DIGI TV under Android platform rules, without replacing the original Google TV launcher or modifying firmware.
 
-## Implemented in version 0.1.0
+## Implemented
 
 1. **TV interface**
    - Native Android Activity with remote-friendly focusable controls.
    - Saved Mode A / Mode B preference.
-   - Saved intended launch delay (0–30 seconds).
-   - Current DIGI TV launch-activity availability status.
-   - Manual launch button.
-2. **Launch policy**
-   - Pure decision function for Mode A and Mode B.
-   - Unit tests for the two decision paths.
+   - Saved launch delay (0–30 seconds).
+   - DIGI TV launch-activity availability status and manual launch.
+2. **Diagnostics**
+   - Debug-only, opt-in bounded capture of app lifecycle and screen broadcasts.
+   - AES-256 encrypted reports uploaded to the private diagnostics repository.
+3. **Standby/wake prototype (Debug only, version 0.4.0)**
+   - Dynamic receiver observes ACTION_SCREEN_OFF and ACTION_SCREEN_ON while the app process is alive.
+   - Mode A schedules DIGI TV after wake.
+   - Mode B uses Usage Access events to determine whether ro.digionline.tv was the most recently resumed app at screen-off.
+   - Uses the user-granted SYSTEM_ALERT_WINDOW special permission as the Android background-activity-launch exemption. The app does not draw an overlay.
+   - Records decisions and launch outcomes in the existing opt-in diagnostics.
 
-The mode and delay controls currently store preferences only. They do not
-trigger automation in this version.
+## Experimental limitations
 
-## Planned components
+The receiver is registered dynamically and is lost if Android kills the app process. This prototype does not yet include a persistent foreground service or boot-time restart. It must be tested on the DIGI R1A before being considered reliable.
 
-1. **Foreground app tracking**
-   - Investigate Usage Access for determining the last foreground app.
-   - Request only permissions demonstrated to be necessary.
-2. **Standby / wake detection**
-   - Investigate lifecycle events and broadcasts available to ordinary apps.
-   - Validate actual behavior on the DIGI R1A firmware.
-3. **Launch controller**
-   - Resolve the DIGI TV launch intent dynamically from package
-     `ro.digionline.tv`.
-   - Handle missing or disabled target applications gracefully.
-   - Respect Android background activity launch restrictions.
-4. **Diagnostics**
-   - Record detection events, decisions, launch attempts and failures.
-   - Avoid collecting unrelated personal data.
+Android restricts background Activity launches. The overlay special access is requested only in the Debug test build; it is not present in Release. Usage Access is needed only for Mode B. These permissions must be explicitly granted by the user in Android settings.
 
-## Important limitation
-
-Android may restrict background applications from starting activities.
-The actual feasibility of automatic launch must be established on the
-DIGI R1A firmware. No behavior is considered validated before device tests.
+A successful call to startActivity() is not proof that DIGI TV actually became visible. Device testing and diagnostic events must confirm the result.
 
 ## Launcher and certification
 
-The original Android TV / Google TV launcher remains unchanged. The app does
-not request root, unlock the bootloader, modify firmware or touch protected
-system partitions. Widevine L1 and Google TV certification remain mandatory
-device acceptance checks.
+The original Android TV / Google TV launcher remains unchanged. No root, bootloader unlock, custom firmware or protected system partition changes are used. Widevine L1 and Google TV certification remain mandatory acceptance checks.
