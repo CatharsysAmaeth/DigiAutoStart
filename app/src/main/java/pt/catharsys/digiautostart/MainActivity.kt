@@ -59,7 +59,8 @@ class MainActivity : Activity() {
         content.addView(text("DigiAutoStart", 30f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         })
-        content.addView(text("DIGI TV • Assistente de arranque", 16f).apply {
+        val buildLabel = "${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEBUG) " • DEBUG" else ""
+        content.addView(text("DIGI TV • Assistente de arranque • $buildLabel", 14f).apply {
             setTextColor(0xFFB8C7D1.toInt())
         }, margin(top = 4, bottom = 20))
 
