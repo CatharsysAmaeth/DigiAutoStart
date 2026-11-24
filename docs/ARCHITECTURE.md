@@ -26,7 +26,7 @@ DAdA reopens the selected DIGI TV app after standby and can optionally open it w
 
 ## Release isolation
 
-The normal Release contains the tested automation and its configuration screen. Debug menus, diagnostic collection, private test-updater code and Debug-only network/package-install permissions are excluded.
+The normal Release contains the tested automation and its configuration screen. Debug menus, diagnostic collection, internal test-update tools and Debug-only network/package-install permissions are excluded.
 
 ## Certification constraints
 
