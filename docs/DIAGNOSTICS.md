@@ -2,52 +2,27 @@
 
 ## Scope
 
-The diagnostics implementation is deliberately isolated under `src/debug`.
-The Release variant receives only a no-op API shim under `src/release`, has
-no diagnostics UI, no diagnostic receiver, no INTERNET permission and no
-ZIP-encryption or upload dependencies.
+Diagnostics are isolated under src/debug. Release receives a no-op API shim and excludes the diagnostics UI, receiver, INTERNET permission, FileProvider, updater and ZIP encryption/upload dependencies.
 
-The Debug build records only app-owned lifecycle/launch events and the
-ACTION_SCREEN_ON / ACTION_SCREEN_OFF broadcasts observed while the app process
-is alive. A received screen broadcast is recorded as an observation; it is
-not proof that the device entered or left standby.
+The Debug build records app-owned lifecycle/launch events and ACTION_SCREEN_ON / ACTION_SCREEN_OFF observations while the app process is alive. These broadcasts are observations, not proof of a hardware standby state.
+
+Version 0.4.0 also records the experimental automation receiver's decisions: last foreground package (Mode B), whether launch was scheduled, and launch success/exception/permission-blocked outcomes. It does not collect a general usage history or export unrelated app activity.
 
 ## Privacy and retention
 
-- Capture is opt-in and starts only when the user selects "Iniciar recolha".
-- The log is bounded to approximately 1 MiB, with one previous segment.
-- No serial number, MAC address, IP address, SSID, account information,
-  credentials, DIGI TV content or broad app-usage history is collected.
+- Capture is opt-in and bounded to approximately 1 MiB plus one previous segment.
+- No serial number, MAC address, IP address, SSID, account information, credentials or DIGI TV content is collected.
 - Device summary contains Android version, manufacturer/model and app version.
-- "Apagar registos" deletes the current and previous event logs.
-- The password is entered at export time and is not saved by the app.
-- Export uses ZIP AES-256 encryption. The password is not embedded in this
-  public repository or in the APK source.
-- The ZIP contains the current and previous log segment, when present.
+- Reports are AES-256 encrypted and uploaded to the private diagnostics repo.
 
-## Private GitHub upload
+## Automation test permissions
 
-The Debug build can upload the latest encrypted ZIP to
-`CatharsysAmaeth/DigiAutoStart-Diagnostics`, under `reports/`.
+The Debug-only automation prototype may ask the user to grant:
+- **Usage Access** — only required for Mode B, to identify the most recently resumed package at screen-off.
+- **Display over other apps** — used as Android's documented exception for starting an Activity from the background. DigiAutoStart does not draw an overlay.
 
-The user must create a GitHub fine-grained personal access token with:
-- Resource owner: `CatharsysAmaeth`
-- Repository access: only `DigiAutoStart-Diagnostics`
-- Repository permissions: `Contents: Read and write`
-- An expiry date (prefer a short lifetime, e.g. 30 days).
+These permissions are not added to the Release manifest. They do not require root, bootloader changes or firmware modifications.
 
-The token is entered in the Debug app, encrypted at rest using an
-Android Keystore AES-GCM key, and never included in logs or reports. The app
-uses it only for the private repository API. Revoking the token in GitHub
-immediately disables future uploads. Clearing app data removes the encrypted
-token; uninstalling the app removes the app's Keystore key.
+## Known limitation
 
-Only the already AES-256-encrypted ZIP is uploaded. The GitHub repository
-therefore stores ciphertext, not readable diagnostic content. The ZIP
-password is separate from the GitHub token.
-
-## Limitations
-
-Screen broadcasts are observations, not proof of standby/wake. No automatic
-standby detection or DIGI TV relaunch is implemented yet. No Usage Access,
-Accessibility, overlay, root, bootloader or firmware permissions are requested.
+The screen receiver is dynamically registered while the process is alive. If Android kills the process, it cannot observe the next wake until DigiAutoStart is opened again. A persistent service/restart strategy is a separate decision and has not yet been implemented.
