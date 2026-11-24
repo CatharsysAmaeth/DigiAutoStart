@@ -10,6 +10,10 @@ on:
       - "*.gradle.kts"
       - "gradle.properties"
       - ".github/workflows/android-ci.yml"
+      - ".github/workflows/release.yml"
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
   pull_request:
     branches:
       - main
@@ -18,6 +22,10 @@ on:
       - "*.gradle.kts"
       - "gradle.properties"
       - ".github/workflows/android-ci.yml"
+      - ".github/workflows/release.yml"
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
   workflow_dispatch:
 
 permissions:
@@ -54,8 +62,34 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Run unit tests and build debug APK
-        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug
+      - name: Run unit tests and build debug and release APKs
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug assembleRelease
+
+      - name: Verify diagnostics are absent from Release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > /tmp/release-manifest.txt
+          if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
+            echo "Unexpected diagnostics FileProvider found in Release manifest"
+            exit 1
+          fi
+          while IFS= read -r dex; do
+            if unzip -p "$APK" "$dex" | strings | grep -q 'net/lingala/zip4j'; then
+              echo "Unexpected Zip4j classes found in Release APK"
+              exit 1
+            fi
+          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
+          if unzip -p "$APK" classes.dex | strings | grep -Fq 'Diagnósticos (Debug)'; then
+            echo "Unexpected diagnostics UI string found in Release APK"
+            exit 1
+          fi
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE|android.permission.INTERNET'; then
+            echo "Unexpected sensitive permission found in Release APK"
+            exit 1
+          fi
 
       - name: Upload debug APK
         if: success()
@@ -63,5 +97,14 @@ jobs:
         with:
           name: DigiAutoStart-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload normal Release APK
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: DigiAutoStart-normal-${{ github.sha }}
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14

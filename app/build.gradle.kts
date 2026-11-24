@@ -11,9 +11,21 @@ android {
         applicationId = "pt.catharsys.digiautostart"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // The Release APK uses the standard local debug key for sideload testing.
+    // This is not a production-distribution signing identity.
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -32,4 +44,6 @@ android {
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    debugImplementation("androidx.core:core:1.17.0")
+    debugImplementation("net.lingala.zip4j:zip4j:2.11.5")
 }

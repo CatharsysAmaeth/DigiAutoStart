@@ -21,13 +21,31 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DiagnosticsFeature.record(this, "activity_created")
         render()
         refreshStatus()
     }
 
+    override fun onStart() {
+        super.onStart()
+        DiagnosticsFeature.attach(applicationContext)
+        DiagnosticsFeature.record(this, "activity_started")
+    }
+
     override fun onResume() {
         super.onResume()
+        DiagnosticsFeature.record(this, "activity_resumed")
         if (::status.isInitialized) refreshStatus()
+    }
+
+    override fun onPause() {
+        DiagnosticsFeature.record(this, "activity_paused")
+        super.onPause()
+    }
+
+    override fun onStop() {
+        DiagnosticsFeature.record(this, "activity_stopped")
+        super.onStop()
     }
 
     private fun render() {
@@ -90,6 +108,10 @@ class MainActivity : Activity() {
         content.addView(button("Testar abertura da DIGI TV") { launchDigiTv() }, margin(bottom = 12))
         content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 20))
 
+        if (BuildConfig.DEBUG) {
+            content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
+        }
+
         content.addView(text("Estado desta versão", 20f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         }, margin(bottom = 8))
@@ -115,18 +137,23 @@ class MainActivity : Activity() {
         } else {
             "DIGI TV não encontrada • confirma que está instalada"
         }
+        DiagnosticsFeature.record(this, "target_status_checked", "launch_intent_available=${packageManager.getLaunchIntentForPackage(targetPackage) != null}")
     }
 
     private fun launchDigiTv() {
+        DiagnosticsFeature.record(this, "manual_launch_requested")
         val intent = packageManager.getLaunchIntentForPackage(targetPackage)
         if (intent == null) {
             refreshStatus()
+            DiagnosticsFeature.record(this, "manual_launch_failed", "reason=no_launch_intent")
             Toast.makeText(this, "Não foi encontrada uma atividade de arranque da DIGI TV.", Toast.LENGTH_LONG).show()
             return
         }
         try {
             startActivity(intent)
+            DiagnosticsFeature.record(this, "manual_launch_start_activity_returned")
         } catch (error: Exception) {
+            DiagnosticsFeature.record(this, "manual_launch_exception", "exception=${error.javaClass.simpleName}")
             Toast.makeText(this, "Não foi possível abrir a DIGI TV: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
         }
     }
