@@ -129,7 +129,7 @@ jobs:
           # The production app must contain the automation components and required permissions.
           grep -Fq 'AutomationService' /tmp/release-manifest.txt
           grep -Fq 'AutomationBootReceiver' /tmp/release-manifest.txt
-          for permission in SYSTEM_ALERT_WINDOW PACKAGE_USAGE_STATS FOREGROUND_SERVICE RECEIVE_BOOT_COMPLETED; do
+          for permission in SYSTEM_ALERT_WINDOW PACKAGE_USAGE_STATS FOREGROUND_SERVICE FOREGROUND_SERVICE_SPECIAL_USE RECEIVE_BOOT_COMPLETED; do
             grep -Fq "android.permission.$permission" /tmp/release-manifest.txt
           done
 
