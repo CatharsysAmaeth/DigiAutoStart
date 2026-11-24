@@ -16,8 +16,8 @@ android {
         applicationId = "pt.catharsys.digiautostart"
         minSdk = 31
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.5.4"
+        versionCode = 11
+        versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -41,7 +41,7 @@ android {
             buildConfigField("String", "DIAGNOSTICS_ZIP_PASSWORD_B64", "\"$diagnosticsPasswordB64\"")
         }
         getByName("release") {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (stableDebugStorePath.isNotBlank()) signingConfigs.getByName("stableDebug") else signingConfigs.getByName("debug")
         }
     }
 
