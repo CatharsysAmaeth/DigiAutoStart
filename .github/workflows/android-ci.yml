@@ -60,7 +60,7 @@ jobs:
         with:
           gradle-version: "8.13"
 
-      - name: Run unit tests and build debug APK
+      - name: Run unit tests and build debug and release APKs
         run: gradle --no-daemon --stacktrace testDebugUnitTest assembleDebug assembleRelease
 
       - name: Verify diagnostics are absent from Release APK
@@ -79,22 +79,8 @@ jobs:
               echo "Unexpected Zip4j classes found in Release APK"
               exit 1
             fi
-          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*\\.dex
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
-            echo "Unexpected sensitive permission found in Release APK"
-            exit 1
-          fi
-
-      - name: Upload debug APK
-        if: success()
-        uses: actions/upload-artifact@v7
-        with:
-          name: DigiAutoStart-debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
-)
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
+          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
+          if aapt dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
             echo "Unexpected sensitive permission found in Release APK"
             exit 1
           fi
