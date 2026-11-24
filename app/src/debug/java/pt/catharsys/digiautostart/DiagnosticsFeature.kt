@@ -221,6 +221,7 @@ object DiagnosticsFeature {
         val input = EditText(activity).apply {
             hint = "GitHub fine-grained token"
             inputType = 129
+            importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
             setSingleLine(true)
         }
         AlertDialog.Builder(activity)
@@ -233,7 +234,7 @@ object DiagnosticsFeature {
             .setView(input)
             .setPositiveButton("Guardar e validar") { _, _ ->
                 val token = input.text?.toString()?.trim().orEmpty()
-                if (!token.startsWith("github_pat_") && !token.startsWith("ghp_")) {
+                if (!token.startsWith("github_pat_")) {
                     Toast.makeText(activity, "Token GitHub inválido ou vazio.", Toast.LENGTH_LONG).show()
                 } else {
                     try {

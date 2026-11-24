@@ -80,7 +80,11 @@ jobs:
               exit 1
             fi
           done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$' || true)
-          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE'; then
+          if unzip -p "$APK" classes.dex | strings | grep -Fq 'Diagnósticos (Debug)'; then
+            echo "Unexpected diagnostics UI string found in Release APK"
+            exit 1
+          fi
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$APK" | grep -Ei 'PACKAGE_USAGE_STATS|SYSTEM_ALERT_WINDOW|BIND_ACCESSIBILITY_SERVICE|android.permission.INTERNET'; then
             echo "Unexpected sensitive permission found in Release APK"
             exit 1
           fi
