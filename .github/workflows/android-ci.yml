@@ -132,7 +132,7 @@ jobs:
             grep -Fq "android.permission.$permission" /tmp/release-manifest.txt
           done
 
-          # Private diagnostics, file sharing, updater and Debug-only network/install access must be absent.
+          # Internal diagnostics, file sharing, updater and Debug-only network/install access must be absent.
           if grep -E 'androidx.core.content.FileProvider|diagnostics.files' /tmp/release-manifest.txt; then
             echo "Unexpected diagnostics FileProvider found in Release manifest"
             exit 1
@@ -152,10 +152,13 @@ jobs:
             echo "Unexpected internal diagnostic or Debug updater code found in Release APK"
             exit 1
           fi
-          if ! printf '%s' "$DEX_STRINGS" | grep -q 'automation_screen_off_decision'; then
-            echo "Standby automation implementation is missing from Release APK"
-            exit 1
-          fi
+          # These preference keys are used by the real service/boot flow, not by the no-op diagnostics shim.
+          for marker in wake_should_launch launch_digi_on_boot; do
+            if ! printf '%s' "$DEX_STRINGS" | grep -F "$marker" >/dev/null; then
+              echo "Standby/startup automation marker is missing from Release APK: $marker"
+              exit 1
+            fi
+          done
 
       - name: Publish stable APK as a public GitHub Release
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
