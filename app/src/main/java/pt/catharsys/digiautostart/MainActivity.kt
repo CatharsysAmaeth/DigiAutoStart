@@ -56,12 +56,12 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFF101820.toInt())
         }
 
-        content.addView(text("DigiAutoStart", 30f, true).apply {
+        content.addView(text("DAdA", 34f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         })
         val buildLabel = "${BuildConfig.VERSION_NAME}" + if (BuildConfig.DEBUG) " • DEBUG" else ""
-        content.addView(text("DIGI TV • Assistente de arranque • $buildLabel", 14f).apply {
-            setTextColor(0xFFB8C7D1.toInt())
+        content.addView(text("DIGI TV · Assistente de arranque · $buildLabel", 15f).apply {
+            setTextColor(0xFFB8DDF2.toInt())
         }, margin(top = 4, bottom = 20))
 
         status = text("", 18f, true).apply {
@@ -71,7 +71,7 @@ class MainActivity : Activity() {
         }
         content.addView(status, margin(bottom = 20))
 
-        content.addView(text("Modo pretendido", 20f, true).apply {
+        content.addView(text("Modo de reabertura após standby", 20f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         }, margin(bottom = 8))
 
@@ -86,7 +86,7 @@ class MainActivity : Activity() {
         }
         content.addView(modeGroup, margin(bottom = 18))
 
-        content.addView(text("Atraso pretendido antes de abrir", 18f, true).apply {
+        content.addView(text("Atraso antes de abrir DIGI TV", 18f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         })
         delayValue = text("", 16f).apply { setTextColor(0xFFB8C7D1.toInt()) }
@@ -108,24 +108,24 @@ class MainActivity : Activity() {
         delayValue.text = "${delay.progress} segundos"
 
         content.addView(button("Testar abertura da DIGI TV") { launchDigiTv() }, margin(bottom = 12))
-        content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 20))
+        content.addView(button("Atualizar estado") { refreshStatus() }, margin(bottom = 12))
 
         if (BuildConfig.DEBUG) {
-            content.addView(button("Configurar automação (teste)") { AutomationFeature.configure(this) }, margin(bottom = 12))
+            content.addView(button("Arranque automático e standby") { AutomationFeature.configure(this) }, margin(bottom = 12))
             content.addView(button("Verificar atualizações") { DebugUpdateFeature.check(this) }, margin(bottom = 12))
             content.addView(button("Diagnósticos (Debug)") { DiagnosticsFeature.show(this) }, margin(bottom = 20))
         }
 
-        content.addView(text("Estado desta versão", 20f, true).apply {
+        content.addView(text("Sobre o DAdA", 20f, true).apply {
             setTextColor(0xFFFFFFFF.toInt())
         }, margin(bottom = 8))
         content.addView(text(
-            "Esta versão inclui automação experimental: um serviço em primeiro plano mantém a deteção de standby/retoma ativa, tenta abrir a DIGI TV segundo o modo escolhido e solicita recuperação após reinício da box. Configura-a em «Configurar automação (teste)». O comportamento ainda precisa de validação nesta box.",
+            "Assistente de arranque da DIGI TV. A automação é experimental e requer permissões especiais do Android. Em «Arranque automático e standby» podes ativar a monitorização após standby e, separadamente, escolher se a DIGI TV deve abrir quando a box liga.",
             16f
         ).apply { setTextColor(0xFFD2DCE2.toInt()) }, margin(bottom = 14))
 
         content.addView(text(
-            "A aplicação não altera o launcher, firmware, bootloader nem partições do equipamento.",
+            "O DAdA não altera o launcher, firmware, bootloader nem partições do equipamento.",
             14f
         ).apply { setTextColor(0xFF8FA3AE.toInt()) })
 
