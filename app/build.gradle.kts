@@ -16,7 +16,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // The Release APK is signed with the standard local debug key for sideload testing.\n    // This is not a production-distribution signing identity.\n    buildTypes {\n        getByName("release") {\n            signingConfig = signingConfigs.getByName("debug")\n        }\n    }\n\n    buildFeatures {
+    // The Release APK uses the standard local debug key for sideload testing.
+    // This is not a production-distribution signing identity.
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    buildFeatures {
         buildConfig = true
     }
 
