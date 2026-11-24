@@ -1,33 +1,21 @@
-# DigiAutoStart
+# DAdA — DIGI TV · Assistente de arranque
 
-Native Android application for the DIGI R1A that aims to reopen DIGI TV automatically after standby.
+Native Android TV assistant for the DIGI R1A, designed to reopen DIGI TV after standby and optionally when the box starts.
 
 ## Current Debug test build
 
-**Version 0.5.0 — persistent standby automation prototype**
+**Version 0.5.3 — branding and clearer startup controls**
 
-- Mode A: always try to open DIGI TV after wake.
+- App name shown on Android TV: **DAdA**.
+- Product description: **DIGI TV · Assistente de arranque**.
+- Blue adaptive launcher icon.
+- Main-screen entry point: “Arranque automático e standby”.
+- Mode A: try to open DIGI TV after every wake.
 - Mode B: only try if DIGI TV was the last foreground user app.
-- Configurable delay (0–30 seconds).
-- Foreground service keeps screen monitoring active when the app's Activity is not visible.
-- Sticky restart and boot receiver request recovery after process reclamation and device reboot.
-- Persistent notification includes a stop action.
-- Android special access is required to attempt a background activity launch.
+- Independent option to open DIGI TV when the box starts (off by default).
+- Configurable wake delay (0–30 seconds).
 
-**Not yet validated on the physical DIGI R1A.** Android/vendor restrictions may still block the launch or stop the service. The device test must confirm actual DIGI TV visibility after wake. Do not treat the prototype as production-ready until then.
-
-## Permissions
-
-- Mode A: Display over other apps.
-- Mode B: additionally Usage Access.
-- Foreground service and boot completed for persistence/recovery.
-
-All automation features and permissions are Debug-only. Release remains free of these components until device validation passes.
-
-## APK locations
-
-- Normal Release APK: [apk/DigiAutoStart-normal.apk](apk/DigiAutoStart-normal.apk)
-- Private Debug APK and version metadata: [DigiAutoStart-Diagnostics/apk](https://github.com/CatharsysAmaeth/DigiAutoStart-Diagnostics/tree/main/apk)
+The prototype still requires physical validation on the DIGI R1A. Android/vendor restrictions may block background launches or service recovery. A successful startActivity call is not proof that DIGI TV became visible.
 
 ## Device constraints
 
@@ -35,3 +23,8 @@ All automation features and permissions are Debug-only. Release remains free of 
 - DIGI TV package: `ro.digionline.tv`.
 - Preserve Widevine L1, Google/Android TV certification and the original launcher.
 - No root, bootloader unlock, custom firmware or protected partition changes.
+
+## APK locations
+
+- Normal Release APK: [apk/DigiAutoStart-normal.apk](apk/DigiAutoStart-normal.apk)
+- Private Debug APK and version metadata: [DigiAutoStart-Diagnostics/apk](https://github.com/CatharsysAmaeth/DigiAutoStart-Diagnostics/tree/main/apk)
