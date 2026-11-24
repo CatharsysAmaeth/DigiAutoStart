@@ -137,7 +137,7 @@ object DiagnosticsFeature {
                         "android_release=${Build.VERSION.RELEASE}\n" +
                         "device_model=${Build.MODEL}\n" +
                         "manufacturer=${Build.MANUFACTURER}\n" +
-                        "target_package=$TARGET_PACKAGE\n" +
+                        "target_package=${TargetAppResolver.selectedPackage(activity) ?: "not_detected"}\n" +
                         "screen_broadcasts_are_observations_not_proof_of_standby_or_wake\n"
                 )
                 val zip = File(exportDir, "DigiAutoStart-$stamp-encrypted.zip")
