@@ -34,38 +34,46 @@ object AutomationFeature {
         if (!enabled) actions += "Ativar automação"
         if (enabled) actions += "Desativar automação"
 
+        // Android AlertDialog cannot display setMessage() and setItems() together.
+        // Show status first, then present the action list in a separate dialog.
         AlertDialog.Builder(activity)
             .setTitle("Automação automática")
             .setMessage(message)
-            .setItems(actions.toTypedArray()) { _, which ->
-                when (actions[which]) {
-                    "Autorizar «Mostrar sobre outras aplicações»" ->
-                        activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${activity.packageName}")))
-                    "Autorizar acesso às estatísticas" ->
-                        activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
-                    "Ativar automação" -> {
-                        val ready = Settings.canDrawOverlays(activity) &&
-                            (prefs.getInt("mode", 2) == 1 || hasUsageAccess(activity))
-                        if (!ready) {
-                            Toast.makeText(activity, "Concede primeiro as permissões indicadas e volta a abrir esta opção.", Toast.LENGTH_LONG).show()
-                        } else {
-                            prefs.edit().putBoolean("automation_enabled", true).apply()
-                            try {
-                                AutomationService.start(activity)
-                                Toast.makeText(activity, "Automação ativada. O serviço fica ativo em segundo plano.", Toast.LENGTH_LONG).show()
-                            } catch (error: Exception) {
-                                prefs.edit().putBoolean("automation_enabled", false).apply()
-                                Toast.makeText(activity, "Não foi possível iniciar o serviço: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+            .setPositiveButton("Continuar") { _, _ ->
+                AlertDialog.Builder(activity)
+                    .setTitle("O que pretendes fazer?")
+                    .setItems(actions.toTypedArray()) { _, which ->
+                        when (actions[which]) {
+                            "Autorizar «Mostrar sobre outras aplicações»" ->
+                                activity.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${activity.packageName}")))
+                            "Autorizar acesso às estatísticas" ->
+                                activity.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                            "Ativar automação" -> {
+                                val ready = Settings.canDrawOverlays(activity) &&
+                                    (prefs.getInt("mode", 2) == 1 || hasUsageAccess(activity))
+                                if (!ready) {
+                                    Toast.makeText(activity, "Concede primeiro as permissões indicadas e volta a abrir esta opção.", Toast.LENGTH_LONG).show()
+                                } else {
+                                    prefs.edit().putBoolean("automation_enabled", true).apply()
+                                    try {
+                                        AutomationService.start(activity)
+                                        Toast.makeText(activity, "Automação ativada. O serviço fica ativo em segundo plano.", Toast.LENGTH_LONG).show()
+                                    } catch (error: Exception) {
+                                        prefs.edit().putBoolean("automation_enabled", false).apply()
+                                        Toast.makeText(activity, "Não foi possível iniciar o serviço: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            }
+                            "Desativar automação" -> {
+                                prefs.edit().putBoolean("automation_enabled", false).putBoolean("wake_should_launch", false).apply()
+                                AutomationService.stop(activity)
+                                Toast.makeText(activity, "Automação desativada.", Toast.LENGTH_SHORT).show()
                             }
                         }
                     }
-                    "Desativar automação" -> {
-                        prefs.edit().putBoolean("automation_enabled", false).putBoolean("wake_should_launch", false).apply()
-                        AutomationService.stop(activity)
-                        Toast.makeText(activity, "Automação desativada.", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                    .setNegativeButton("Fechar", null)
+                    .show()
             }
             .setNegativeButton("Fechar", null)
             .show()
