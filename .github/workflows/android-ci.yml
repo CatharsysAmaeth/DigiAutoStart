@@ -144,17 +144,19 @@ jobs:
             exit 1
           fi
 
-          while IFS= read -r dex; do
-            DEX_STRINGS="$(unzip -p "$APK" "$dex" | strings)"
-            if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DIAGNOSTICS_GITHUB_TOKEN|DIAGNOSTICS_ZIP_PASSWORD|DigiAutoStart-Diagnostics|Diagnósticos \(Debug\)|Verificar atualizações'; then
-              echo "Unexpected private diagnostics or Debug updater code found in Release APK"
-              exit 1
-            fi
-            if ! printf '%s' "$DEX_STRINGS" | grep -q 'automation_screen_off_decision'; then
-              echo "Standby automation implementation is missing from Release APK"
-              exit 1
-            fi
-          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$')
+          # Inspect all DEX files together: the implementation marker may live in a secondary DEX.
+          DEX_STRINGS="$(while IFS= read -r dex; do
+            unzip -p "$APK" "$dex" | strings
+          done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$'))"
+
+          if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DIAGNOSTICS_GITHUB_TOKEN|DIAGNOSTICS_ZIP_PASSWORD|DigiAutoStart-Diagnostics|Diagnósticos \\(Debug\\)|Verificar atualizações'; then
+            echo "Unexpected private diagnostics or Debug updater code found in Release APK"
+            exit 1
+          fi
+          if ! printf '%s' "$DEX_STRINGS" | grep -q 'automation_screen_off_decision'; then
+            echo "Standby automation implementation is missing from Release APK"
+            exit 1
+          fi
 
       - name: Publish normal APK in public repository
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
