@@ -44,7 +44,7 @@ object DebugUpdateFeature {
                     return@Thread
                 }
 
-                val apk = downloadApk(token, "$API/apk/DigiAutoStart-debug.apk")
+                val apk = downloadApk(activity.applicationContext, token, "$API/apk/DigiAutoStart-debug.apk")
                 val expectedSha = metadata.getString("sha256").lowercase()
                 val actualSha = sha256(apk)
                 if (!actualSha.equals(expectedSha, ignoreCase = true)) {
@@ -80,12 +80,12 @@ object DebugUpdateFeature {
         }
     }
 
-    private fun downloadApk(token: String, endpoint: String): File {
+    private fun downloadApk(context: android.content.Context, token: String, endpoint: String): File {
         val connection = open(token, endpoint, "application/vnd.github.raw")
         try {
             val status = connection.responseCode
             if (status !in 200..299) error("GitHub HTTP $status ao descarregar APK")
-            val directory = File(appCacheDirectory(), "updates").apply { mkdirs() }
+            val directory = File(context.cacheDir, "updates").apply { mkdirs() }
             val output = File(directory, "DigiAutoStart-debug-update.apk")
             connection.inputStream.use { input -> output.outputStream().use { input.copyTo(it) } }
             return output
@@ -93,8 +93,6 @@ object DebugUpdateFeature {
             connection.disconnect()
         }
     }
-
-    private fun appCacheDirectory(): File = DebugUpdateContextHolder.context.cacheDir
 
     private fun open(token: String, endpoint: String, accept: String) =
         (URL(endpoint).openConnection() as HttpURLConnection).apply {
@@ -136,11 +134,4 @@ object DebugUpdateFeature {
         activity.startActivity(intent)
     }
 
-    private object DebugUpdateContextHolder {
-        lateinit var context: android.content.Context
-    }
-
-    fun attach(context: android.content.Context) {
-        DebugUpdateContextHolder.context = context.applicationContext
-    }
 }
