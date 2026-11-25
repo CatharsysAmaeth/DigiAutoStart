@@ -139,7 +139,7 @@ jobs:
               # aapt renders this enum as its numeric bitmask (0x40000000), not the source token.
               grep -Eqi 'foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"
             else
-              if grep -Eq 'FOREGROUND_SERVICE_SPECIAL_USE|specialUse|PROPERTY_SPECIAL_USE_FGS_SUBTYPE' "$MANIFEST"; then
+              if grep -Eq 'FOREGROUND_SERVICE_SPECIAL_USE|PROPERTY_SPECIAL_USE_FGS_SUBTYPE|foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"; then
                 echo "Android 9 manifest contains Android 14-only foreground-service declarations"
                 exit 1
               fi
