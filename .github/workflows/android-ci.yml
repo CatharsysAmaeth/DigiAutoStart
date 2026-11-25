@@ -140,8 +140,9 @@ jobs:
                 echo "Android 9 manifest contains Android 14-only foreground-service declarations"
                 exit 1
               fi
-              "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "sdkVersion:'28'"
-              "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='pt.catharsys.digiautostart.android9'"
+              BADGING="$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")"
+              grep -Fq "sdkVersion:'28'" <<< "$BADGING"
+              grep -Fq "package: name='pt.catharsys.digiautostart.android9'" <<< "$BADGING"
             fi
 
             if grep -E 'androidx.core.content.FileProvider|diagnostics.files' "$MANIFEST"; then
