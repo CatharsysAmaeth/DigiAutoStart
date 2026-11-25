@@ -20,17 +20,19 @@ Build environment:
 - Gradle 8.13.
 
 The workflow:
-1. Runs unit tests.
-2. Builds Debug and normal Release APKs.
-3. Checks that Release contains the standby/startup automation and required permissions.
-4. Checks that Release excludes diagnostic tools, internal test-update tools and Debug-only network/package-install permissions.
-5. Creates or updates a versioned GitHub Release with the stable APK only from `main`; pull requests do not publish it.
+1. Runs the Android 12 Debug unit tests.
+2. Builds Android 12 Debug, Android 12 Release and Android 9 Release APKs.
+3. Checks that both Release variants contain standby/startup automation and the required permissions.
+4. Checks that Android 9 omits Android 14-only special-use foreground-service declarations.
+5. Checks that both Release variants exclude diagnostic tools, internal test-update tools and Debug-only network/package-install permissions.
+6. Publishes the Android 12 and Android 9 stable APKs as separate assets in the same public GitHub Release, only from `main`.
+7. Publishes only the Android 12 Debug APK and its metadata to the private diagnostics repository.
 
 A successful CI build proves that compilation, unit tests and APK-content checks passed. It does not replace physical-device validation of standby/wake behavior.
 
 ## Signing and updates
 
-Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material and internal distribution settings are kept outside the public source tree in protected CI secrets. Never commit signing material or passwords.
+Release APKs must retain the application's established signing identity so an existing installation can be updated without uninstalling it. Signing material and internal distribution settings are kept outside the public source tree in protected CI secrets. Never commit signing material or passwords. The Android 9 flavor has a different application ID and can coexist with the Android 12 installation.
 
 ## Protected CI configuration
 
@@ -44,7 +46,7 @@ Pull-request builds do not receive these secrets and do not publish internal art
 
 ## Device testing boundary
 
-Standby/wake behavior and DRM certification must be checked on physical Android TV hardware. GitHub-hosted runners cannot validate firmware behavior or Widevine state.
+Standby/wake behavior, Android 9 runtime compatibility and DRM certification must be checked on physical Android TV hardware. GitHub-hosted runners cannot validate firmware behavior or Widevine state.
 
 ## Security
 
