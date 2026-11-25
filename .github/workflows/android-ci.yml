@@ -120,7 +120,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'status=$?; echo "::error::Release APK verification failed at line $LINENO (exit $status): $BASH_COMMAND"; exit "$status"' ERR
           for variant in android12 android9; do
+            echo "Verifying $variant Release APK..."
             APK="app/build/outputs/apk/$variant/release/app-$variant-release.apk"
             test -f "$APK"
             MANIFEST="/tmp/$variant-release-manifest.txt"
