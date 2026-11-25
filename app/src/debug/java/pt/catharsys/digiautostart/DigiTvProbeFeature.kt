@@ -128,7 +128,7 @@ object DigiTvProbeFeature {
                 "A recolha de acessibilidade é opcional e exige ativação manual nas definições Android. " +
                     "Quando ativa, a DAdA observa apenas eventos e elementos da janela da aplicação ro.digionline.tv. " +
                     "Pode registar textos visíveis, nomes de componentes, foco e seleção para perceber a navegação. " +
-                    "Não captura imagens, áudio, palavras-passe nem conteúdo de outras aplicações. " +
+                    "Não captura imagens ou áudio e não recolhe eventos de outras aplicações. Os campos que o Android identifica como palavras-passe são substituídos por um marcador; ainda assim, texto visível pode conter informação sensível. " +
                     "Os registos só são guardados quando a recolha de Diagnósticos está ativa e só são enviados quando pedires o envio do relatório. " +
                     "O relatório é encriptado antes do envio para o repositório privado."
             )
