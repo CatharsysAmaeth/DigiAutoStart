@@ -79,7 +79,6 @@ jobs:
           KEYSTORE="$RUNNER_TEMP/digiautostart-signing/debug.keystore"
           KEY_B64=/tmp/digiautostart-debug-keystore.b64
 
-          # Generate a valid JKS key on the first run; reuse the protected copy thereafter.
           if gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/signing/debug.keystore.b64?ref=main" --jq '.content' 2>/dev/null |
              tr -d '\n' | base64 -d > "$KEYSTORE" &&
              keytool -list -keystore "$KEYSTORE" -storetype JKS -storepass android -alias digiautostart >/dev/null 2>&1; then
@@ -104,7 +103,7 @@ jobs:
           echo "DIGIAUTOSTART_SIGNING_STORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
           echo "DIGIAUTOSTART_SIGNING_STORE_PASSWORD=android" >> "$GITHUB_ENV"
 
-      - name: Run unit tests and build debug and release APKs
+      - name: Run unit tests and build all required variants
         env:
           DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
           DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
@@ -117,7 +116,7 @@ jobs:
           export DADA_DEBUG_REPORT_PASSWORD_B64="$(printf '%s' "$DADA_DEBUG_REPORT_PASSWORD" | base64 -w 0)"
           gradle --no-daemon --stacktrace testAndroid12DebugUnitTest assembleAndroid12Debug assembleAndroid12Release assembleAndroid9Release
 
-      - name: Verify Release automation is present and Debug features are absent
+      - name: Verify both Release APKs and variant isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -127,15 +126,12 @@ jobs:
             MANIFEST="/tmp/$variant-release-manifest.txt"
             "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > "$MANIFEST"
 
-            # Both production variants must contain the tested automation components and permissions.
             grep -Fq 'AutomationService' "$MANIFEST"
             grep -Fq 'AutomationBootReceiver' "$MANIFEST"
             for permission in SYSTEM_ALERT_WINDOW PACKAGE_USAGE_STATS FOREGROUND_SERVICE RECEIVE_BOOT_COMPLETED; do
               grep -Fq "android.permission.$permission" "$MANIFEST"
             done
 
-            # The Android 12 build opts into Android 14's special-use FGS type.
-            # The Android 9 build deliberately omits this API-34-only declaration.
             if [ "$variant" = android12 ]; then
               grep -Fq 'FOREGROUND_SERVICE_SPECIAL_USE' "$MANIFEST"
               grep -Fq 'specialUse' "$MANIFEST"
@@ -144,9 +140,10 @@ jobs:
                 echo "Android 9 manifest contains Android 14-only foreground-service declarations"
                 exit 1
               fi
+              "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "sdkVersion:'28'"
+              "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='pt.catharsys.digiautostart.android9'"
             fi
 
-            # Internal diagnostics, file sharing, updater and Debug-only network/install access must be absent.
             if grep -E 'androidx.core.content.FileProvider|diagnostics.files' "$MANIFEST"; then
               echo "Unexpected diagnostics FileProvider found in $variant Release manifest"
               exit 1
@@ -159,9 +156,21 @@ jobs:
 
             DEX_STRINGS="$(while IFS= read -r dex; do
               unzip -p "$APK" "$dex" | strings
-            done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex
+            done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$'))"
 
-      - name: Publish stable APK as a public GitHub Release
+            if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DADA_PRIVATE_(TOKEN|REPOSITORY)_B64|DADA_DEBUG_REPORT_PASSWORD_B64|Diagnósticos \\(Debug\\)|Verificar atualizações'; then
+              echo "Unexpected internal diagnostic or Debug updater code found in $variant Release APK"
+              exit 1
+            fi
+            for marker in wake_should_launch launch_digi_on_boot; do
+              if ! printf '%s' "$DEX_STRINGS" | grep -F "$marker" >/dev/null; then
+                echo "Standby/startup automation marker is missing from $variant Release APK: $marker"
+                exit 1
+              fi
+            done
+          done
+
+      - name: Publish stable APKs as public GitHub Release assets
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -179,7 +188,6 @@ jobs:
           test -f "$APK_ANDROID12"
           test -f "$APK_ANDROID9"
 
-          # Publish both independently installable editions as assets of the same public release.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               "$APK_ANDROID12#DAdA-$VERSION_NAME-Android12.apk" \
@@ -192,7 +200,7 @@ jobs:
               --generate-notes
           fi
 
-      - name: Publish Debug APK and version metadata to internal storage
+      - name: Publish Android 12 Debug APK and version metadata to internal storage
         if: success() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
         env:
           GH_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
@@ -206,8 +214,9 @@ jobs:
             exit 1
           fi
 
+          APK_DEBUG="app/build/outputs/apk/android12/debug/app-android12-debug.apk"
           FILE="apk/DigiAutoStart-debug.apk"
-          base64 -w 0 app/build/outputs/apk/debug/app-debug.apk > /tmp/debug-apk.base64
+          base64 -w 0 "$APK_DEBUG" > /tmp/debug-apk.base64
           EXISTING_SHA="$(gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$FILE?ref=main" --jq '.sha' 2>/dev/null || true)"
           if [ -n "$EXISTING_SHA" ]; then
             jq --rawfile content /tmp/debug-apk.base64 -n --arg message "build: publish Debug APK" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
@@ -219,7 +228,7 @@ jobs:
 
           VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
           VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
-          APK_SHA256="$(sha256sum app/build/outputs/apk/debug/app-debug.apk | awk '{print $1}')"
+          APK_SHA256="$(sha256sum "$APK_DEBUG" | awk '{print $1}')"
           jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
             '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-debug.apk"}' > /tmp/debug-version.json
           base64 -w 0 /tmp/debug-version.json > /tmp/debug-version.base64
@@ -232,99 +241,13 @@ jobs:
               gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/version.json" --input -
           fi
 
-      - name: Upload normal Release APK as a workflow artifact
+      - name: Upload Release APKs as workflow artifacts
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: DAdA-release-no-debug-menu
-          path: app/build/outputs/apk/android12/release/app-android12-release.apk
-          if-no-files-found: error
-          retention-days: 14
-))"
-
-            if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DADA_PRIVATE_(TOKEN|REPOSITORY)_B64|DADA_DEBUG_REPORT_PASSWORD_B64|Diagnósticos \\(Debug\\)|Verificar atualizações'; then
-              echo "Unexpected internal diagnostic or Debug updater code found in $variant Release APK"
-              exit 1
-            fi
-            for marker in wake_should_launch launch_digi_on_boot; do
-              if ! printf '%s' "$DEX_STRINGS" | grep -F "$marker" >/dev/null; then
-                echo "Standby/startup automation marker is missing from $variant Release APK: $marker"
-                exit 1
-              fi
-            done
-          done
-
-      - name: Publish stable APK as a public GitHub Release
-        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
-          if [ -z "$VERSION_NAME" ]; then
-            echo "::error::Could not determine the application version."
-            exit 1
-          fi
-          TAG="v$VERSION_NAME"
-          APK="app/build/outputs/apk/release/app-release.apk"
-          test -f "$APK"
-
-          # Keep binary APKs out of the public source tree. Publish the stable APK
-          # as a versioned asset attached to the corresponding GitHub Release.
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$APK#DAdA-$VERSION_NAME.apk" --clobber
-          else
-            gh release create "$TAG" "$APK#DAdA-$VERSION_NAME.apk" \
-              --title "DAdA $VERSION_NAME" \
-              --generate-notes
-          fi
-
-      - name: Publish Debug APK and version metadata to internal storage
-        if: success() && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
-        env:
-          GH_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
-          PRIVATE_ASSETS_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "::add-mask::$PRIVATE_ASSETS_REPOSITORY"
-          if [ -z "${GH_TOKEN:-}" ] || [ -z "$PRIVATE_ASSETS_REPOSITORY" ]; then
-            echo "::error::Internal artifact publishing is not configured."
-            exit 1
-          fi
-
-          FILE="apk/DigiAutoStart-debug.apk"
-          base64 -w 0 app/build/outputs/apk/debug/app-debug.apk > /tmp/debug-apk.base64
-          EXISTING_SHA="$(gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$FILE?ref=main" --jq '.sha' 2>/dev/null || true)"
-          if [ -n "$EXISTING_SHA" ]; then
-            jq --rawfile content /tmp/debug-apk.base64 -n --arg message "build: publish Debug APK" --arg sha "$EXISTING_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
-              gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$FILE" --input -
-          else
-            jq --rawfile content /tmp/debug-apk.base64 -n --arg message "build: publish Debug APK" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
-              gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$FILE" --input -
-          fi
-
-          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
-          VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
-          APK_SHA256="$(sha256sum app/build/outputs/apk/debug/app-debug.apk | awk '{print $1}')"
-          jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
-            '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-debug.apk"}' > /tmp/debug-version.json
-          base64 -w 0 /tmp/debug-version.json > /tmp/debug-version.base64
-          VERSION_SHA="$(gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/version.json?ref=main" --jq '.sha' 2>/dev/null || true)"
-          if [ -n "$VERSION_SHA" ]; then
-            jq --rawfile content /tmp/debug-version.base64 -n --arg message "build: update Debug version metadata" --arg sha "$VERSION_SHA" --arg branch "main" '{message:$message,content:$content,sha:$sha,branch:$branch}' |
-              gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/version.json" --input -
-          else
-            jq --rawfile content /tmp/debug-version.base64 -n --arg message "build: add Debug version metadata" --arg branch "main" '{message:$message,content:$content,branch:$branch}' |
-              gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/version.json" --input -
-          fi
-
-      - name: Upload normal Release APK as a workflow artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: DAdA-release-no-debug-menu
-          path: app/build/outputs/apk/release/app-release.apk
+          name: DAdA-release-apks
+          path: |
+            app/build/outputs/apk/android12/release/app-android12-release.apk
+            app/build/outputs/apk/android9/release/app-android9-release.apk
           if-no-files-found: error
           retention-days: 14
