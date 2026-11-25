@@ -15,11 +15,26 @@ android {
 
     defaultConfig {
         applicationId = "pt.catharsys.digiautostart"
-        minSdk = 31
+        minSdk = 28
         targetSdk = 35
         versionCode = 11
         versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    flavorDimensions += "androidCompatibility"
+
+    productFlavors {
+        create("android12") {
+            dimension = "androidCompatibility"
+            minSdk = 31
+        }
+        create("android9") {
+            dimension = "androidCompatibility"
+            minSdk = 28
+            applicationIdSuffix = ".android9"
+            versionNameSuffix = "-android9"
+        }
     }
 
     signingConfigs {

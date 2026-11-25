@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Android 9 does not know Android 14's special-use foreground-service type. -->
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:node="remove" />
+
+    <application
+        android:label="DAdA Android 9"
+        tools:replace="android:label">
+        <service
+            android:name=".AutomationService"
+            tools:remove="android:foregroundServiceType">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                tools:node="remove" />
+        </service>
+    </application>
+</manifest>

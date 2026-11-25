@@ -4,6 +4,17 @@
 
 DAdA reopens the selected DIGI TV app after standby and can optionally open it when the Android TV device starts. The original launcher and platform certification must remain intact.
 
+## Supported application variants
+
+The same application module builds two independent product flavors:
+
+- `android12`: minSdk 31, application ID `pt.catharsys.digiautostart`; preserves the existing Android 12+ edition and its package identity.
+- `android9`: minSdk 28, application ID `pt.catharsys.digiautostart.android9`; uses a distinct package identity so both editions can coexist on one device.
+
+The Android 9 Release manifest removes the Android 14 special-use foreground-service permission, service type and subtype property. The service calls the three-argument `startForeground` only on API 34+ and uses the two-argument overload on older Android versions. Dynamic receiver registration uses the flags overload only on API 33+.
+
+Mode B accepts both the API 29+ `ACTIVITY_RESUMED` event and the legacy `MOVE_TO_FOREGROUND` event used by Android 9.
+
 ## Implemented in Release 0.6.0
 
 - Mode A: reopen the selected TV app after every wake.
@@ -26,7 +37,7 @@ DAdA reopens the selected DIGI TV app after standby and can optionally open it w
 
 ## Release isolation
 
-The normal Release contains the tested automation and its configuration screen. Debug menus, diagnostic collection, internal test-update tools and Debug-only network/package-install permissions are excluded.
+Normal Release variants contain the tested automation and its configuration screen. Debug menus, diagnostic collection, internal test-update tools and Debug-only network/package-install permissions are excluded.
 
 ## Certification constraints
 
