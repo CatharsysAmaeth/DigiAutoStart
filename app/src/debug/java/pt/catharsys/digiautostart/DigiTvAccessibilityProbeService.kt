@@ -40,7 +40,7 @@ class DigiTvAccessibilityProbeService : AccessibilityService() {
             else -> false
         }
 
-        val eventText = event.text.orEmpty()
+        val eventText = if (event.isPassword) "[password-field]" else event.text.orEmpty()
             .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
             .joinToString("|")
             .let(::redact)
@@ -72,10 +72,10 @@ class DigiTvAccessibilityProbeService : AccessibilityService() {
         if (depth > MAX_DEPTH || lines.size >= MAX_NODES) return
         val bounds = Rect()
         node.getBoundsInScreen(bounds)
-        val text = redact(node.text?.toString().orEmpty()).take(MAX_NODE_TEXT)
-        val description = redact(node.contentDescription?.toString().orEmpty()).take(MAX_NODE_TEXT)
+        val text = if (node.isPassword) "[password-field]" else redact(node.text?.toString().orEmpty()).take(MAX_NODE_TEXT)
+        val description = if (node.isPassword) "[password-field]" else redact(node.contentDescription?.toString().orEmpty()).take(MAX_NODE_TEXT)
         val viewId = node.viewIdResourceName.orEmpty().take(100)
-        lines += "d=$depth;class=${node.className};id=$viewId;text=$text;desc=$description;click=${node.isClickable};focusable=${node.isFocusable};focused=${node.isFocused};selected=${node.isSelected};bounds=$bounds"
+        lines += "d=$depth;class=${node.className};id=$viewId;text=$text;desc=$description;password=${node.isPassword};click=${node.isClickable};focusable=${node.isFocusable};focused=${node.isFocused};selected=${node.isSelected};bounds=$bounds"
         for (index in 0 until node.childCount) {
             if (lines.size >= MAX_NODES) break
             val child = node.getChild(index) ?: continue
