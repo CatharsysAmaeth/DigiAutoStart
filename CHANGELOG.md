@@ -2,6 +2,14 @@
 
 All notable user-facing changes are documented here. Internal diagnostics, internal service locations, device identifiers, credentials, signing material and personal/network details are intentionally excluded.
 
+## 0.6.0 — Android 9 compatibility edition
+
+- Add a parallel Android 9 (API 28+) edition while retaining the Android 12 (API 31+) edition.
+- Give Android 9 its own application ID so both editions can be installed side by side.
+- Keep the same standby modes, wake delay, target-app selection and optional startup launch.
+- Remove Android 14-only special-use foreground-service manifest declarations from the Android 9 APK.
+- Publish both stable APKs as separate assets in the public GitHub Release.
+
 ## 0.6.0 — First normal Release with automatic startup
 
 - Promote the device-tested standby and startup automation from the prototype build to the normal Release.
