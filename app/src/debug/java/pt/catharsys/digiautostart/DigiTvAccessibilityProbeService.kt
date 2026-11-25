@@ -39,6 +39,9 @@ class DigiTvAccessibilityProbeService : AccessibilityService() {
             }
             else -> false
         }
+        // Ignore other events and throttle content-change events so diagnostics
+        // do not add unnecessary work while the DIGI TV interface is starting.
+        if (!shouldSnapshot) return
 
         val eventText = if (event.isPassword) "[password-field]" else event.text.orEmpty()
             .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
