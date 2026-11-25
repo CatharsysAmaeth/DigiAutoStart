@@ -24,13 +24,13 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Debug-only diagnostics. Captures only DigiAutoStart-owned events and the
- * two screen broadcasts observed while the app process is alive.
+ * Debug-only opt-in diagnostics. Includes DAdA lifecycle events and, when the
+ * user explicitly enables the Debug accessibility observer, DIGI TV UI events.
  */
 object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
-    
+
     private var receiver: BroadcastReceiver? = null
 
     fun attach(context: Context) {
@@ -63,6 +63,9 @@ object DiagnosticsFeature {
         receiver = null
         record(context, "screen_receiver_detached")
     }
+
+    fun isCapturing(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
 
     fun record(context: Context, event: String, details: String = "") {
         if (!isCapturing(context)) return
@@ -202,9 +205,6 @@ object DiagnosticsFeature {
             connection.disconnect()
         }
     }
-
-    private fun isCapturing(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
 
     private fun logFile(context: Context): File =
         File(context.filesDir, "diagnostics/events.jsonl").apply { parentFile?.mkdirs() }
