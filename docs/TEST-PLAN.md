@@ -1,14 +1,47 @@
-# DAdA 0.6.1 Debug investigation test plan
+# DAdA 0.6.1 acceptance and investigation test plan
 
-## T1 — Installation and isolation
+## T1 — Installation and upgrade
 
 - Install the Android 12 Debug update over the existing DAdA Debug app.
 - Confirm the package identity remains `pt.catharsys.digiautostart`.
 - Confirm the Debug version updates without uninstalling the existing app.
-- Confirm the Release APK is not modified or published by this feature branch.
-- Confirm DIGI TV and the original Android TV launcher remain unchanged.
+- Confirm saved preferences remain available after the update.
+- Confirm the original launcher and DIGI TV remain functional.
+- Confirm Widevine L1 and platform certification remain intact.
 
-## T2 — Package and deep-link discovery
+## T2 — Configuration and permissions
+
+- Open the “Configurar” screen using TV remote navigation.
+- Confirm Mode A and Mode B can be selected and saved.
+- Confirm the wake delay can be set from 0 to 30 seconds.
+- Confirm launch-at-startup can be enabled independently.
+- Confirm the app explains and requests only the required special permissions.
+- Confirm Mode B requires Usage Access and both automation modes require Display over other apps access.
+
+## T3 — Standby and wake
+
+- Test Mode A across repeated standby/wake cycles.
+- Test Mode B with DIGI TV as the last foreground app.
+- Test Mode B with another app or the launcher as the last foreground app.
+- Confirm the configured delay is respected.
+- Confirm the disabled state does not reopen the TV app.
+
+## T4 — Startup and recovery
+
+- Test startup launch when enabled.
+- Confirm startup launch remains disabled by default.
+- Confirm enabled standby monitoring is restored after a device restart.
+- Confirm enabled monitoring is restored after an application update.
+- Confirm startup launch remains independent of Mode A/B.
+
+## T5 — Target resolution
+
+- Confirm the official DIGI TV app is selected by default when available.
+- Test conservative discovery of compatible Android TV alternatives.
+- Confirm ambiguous candidates require manual selection.
+- Confirm the selected target is used consistently for standby and startup.
+
+## T6 — Package and deep-link discovery
 
 - Start opt-in Diagnostics collection.
 - Open “Investigar DIGI TV (Debug)”.
@@ -18,12 +51,11 @@
 - Compare with “Abrir DIGI TV normalmente”.
 - Record whether either route reaches the initial screen, channel 1, an error, or another screen.
 
-## T3 — Accessibility observation
+## T7 — Accessibility observation
 
 - Enable Diagnostics collection in DAdA.
 - From the investigation screen, open Android Accessibility settings.
 - Manually enable “Observador de interface DIGI TV (Debug)”.
-- Return to DAdA and verify the probe reports as enabled.
 - Open DIGI TV normally and wait for the initial screen to settle.
 - Record the initial highlighted “Ver mais” state.
 - Observe whether window-state, content-change, focus and selection events are emitted.
@@ -31,7 +63,7 @@
 - Navigate manually with DOWN, DOWN, OK and record the corresponding focus/selection changes and resulting channel screen.
 - Disable the accessibility observer after the test if no longer needed.
 
-## T4 — Variable startup timing
+## T8 — Variable startup timing
 
 - With Diagnostics and the accessibility observer enabled, open DIGI TV normally five times.
 - For each run, record the first DIGI TV window event, the first non-empty view-tree snapshot, the initial “Ver mais” highlight and the first observed live-channel/player state.
@@ -39,16 +71,15 @@
 - Do not use a fixed delay as a proxy for readiness; derive timing from observed UI events.
 - Record any run where the accessibility tree is unavailable or incomplete.
 
-## T5 — Report and privacy
+## T9 — Release isolation and privacy
 
-- Upload the encrypted report only after reviewing the test session and choosing “Criar e enviar relatório”.
-- Treat visible UI text as potentially sensitive even with email/phone redaction.
-- Confirm reports are stored only in the private diagnostics repository.
-- Delete local logs after successful review if they are no longer needed.
-
-## Existing DAdA acceptance checks
-
-Retain the installation, configuration, standby/wake, startup/recovery, target-resolution and Release-isolation checks from the previous acceptance plan.
+- Confirm the normal Release has no Debug menu, diagnostic collection, DIGI TV accessibility observer or internal test-update tools.
+- Confirm Release does not request Debug-only internet, package-install or accessibility-service declarations.
+- Enable the accessibility observer only for the test and only after reading its disclosure.
+- The observer is restricted to package `ro.digionline.tv`; it records bounded visible UI text and node metadata, not screenshots or audio.
+- Password-marked accessibility nodes are recorded as markers rather than text. Email and phone-like strings are redacted, but all reports must still be treated as potentially sensitive.
+- Upload the encrypted report only after explicitly choosing “Criar e enviar relatório”; reports belong only in the private diagnostics repository.
+- Delete local logs after successful review if no longer needed.
 
 ## Evidence rules
 
