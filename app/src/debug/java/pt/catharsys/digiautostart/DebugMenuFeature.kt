@@ -10,6 +10,9 @@ object DebugMenuFeature {
         content.addView(button(activity, "Configurar") {
             AutomationFeature.configure(activity, onSaved)
         }, params(activity, 12))
+        content.addView(button(activity, "Investigar DIGI TV (Debug)") {
+            DigiTvProbeFeature.show(activity)
+        }, params(activity, 12))
         content.addView(button(activity, "Verificar atualizações") {
             DebugUpdateFeature.check(activity)
         }, params(activity, 12))
