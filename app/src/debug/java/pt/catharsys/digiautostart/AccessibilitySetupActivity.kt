@@ -6,6 +6,7 @@ import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -18,10 +19,10 @@ import android.widget.TextView
 /**
  * Debug-only, user-mediated setup for the DIGI TV accessibility observer.
  *
- * On Android TV, first try the AOSP TV Settings OEM link that opens the
- * selected service's own confirmation/toggle screen. If the ROM does not
- * implement that hook, fall back to the standard Accessibility settings page.
- * The system Settings UI remains responsible for the final user confirmation.
+ * The Android TV OEM link is not a public SDK contract. Before launching it,
+ * record PackageManager's resolved activity and matching handlers so that a
+ * successful startActivity() is not mistaken for proof that a service-specific
+ * Settings screen was actually selected.
  */
 class AccessibilitySetupActivity : Activity() {
     private lateinit var status: TextView
@@ -120,44 +121,73 @@ class AccessibilitySetupActivity : Activity() {
                 it.name == serviceComponent.className
         } == true
 
+    private fun describeActivity(component: ComponentName?): String =
+        component?.let { "${it.packageName}/${it.className}" } ?: "none"
+
     private fun openSystemAuthorization() {
         val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
         val serviceInfo = runCatching {
             manager?.installedAccessibilityServiceList.orEmpty().firstOrNull { matches(it) }
         }.getOrNull()
 
-        // AOSP Android TV Settings exposes this exported OEM hook specifically
-        // to open one installed accessibility service's own confirmation page.
-        // The extra name and Parcelable type are defined by TvSettings.
         val tvServiceIntent = serviceInfo?.let {
             Intent(TV_ACCESSIBILITY_SERVICE_ACTION).apply {
                 putExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA, it)
             }
         }
 
-        val tvSettingsOpened = tvServiceIntent?.let { intent ->
-            runCatching {
-                startActivity(intent)
+        if (tvServiceIntent != null) {
+            val resolved = runCatching {
+                packageManager.resolveActivity(
+                    tvServiceIntent, PackageManager.MATCH_DEFAULT_ONLY
+                )?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+            }.getOrNull()
+            val candidates = runCatching {
+                packageManager.queryIntentActivities(
+                    tvServiceIntent, PackageManager.MATCH_DEFAULT_ONLY
+                ).mapNotNull { item ->
+                    item.activityInfo?.let {
+                        "${it.packageName}/${it.name}:exported=${it.exported}"
+                    }
+                }.distinct().take(MAX_ACTIVITY_CANDIDATES)
+            }.getOrDefault(emptyList())
+
+            val serviceId = runCatching { serviceInfo.id }.getOrDefault("unavailable")
+            val servicePackage = serviceInfo.resolveInfo.serviceInfo?.packageName ?: "unknown"
+            val serviceClass = serviceInfo.resolveInfo.serviceInfo?.name ?: "unknown"
+            val preflight = "resolved=${describeActivity(resolved)};candidates=${candidates.joinToString(",")};serviceId=$serviceId;service=$servicePackage/$serviceClass"
+
+            DiagnosticsFeature.record(
+                this, "accessibility_tv_oem_link_preflight", preflight
+            )
+
+            val tvSettingsOpened = runCatching {
+                startActivity(tvServiceIntent)
                 true
             }.getOrElse { error ->
                 DiagnosticsFeature.record(
                     this, "accessibility_tv_oem_link_failed",
-                    "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)}"
+                    "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)};$preflight"
                 )
                 false
             }
-        } ?: false
 
-        if (tvSettingsOpened) {
-            lastLaunchRoute = "página específica do serviço Android TV"
+            if (tvSettingsOpened) {
+                lastLaunchRoute = "pedido enviado; destino resolvido: ${describeActivity(resolved)}"
+                DiagnosticsFeature.record(
+                    this, "accessibility_tv_oem_link_launch_accepted",
+                    "action=$TV_ACCESSIBILITY_SERVICE_ACTION;resolved=${describeActivity(resolved)};candidates=${candidates.joinToString(",")};service_found=true"
+                )
+                return
+            }
+        } else {
             DiagnosticsFeature.record(
-                this, "accessibility_tv_oem_link_opened",
-                "action=$TV_ACCESSIBILITY_SERVICE_ACTION,component=${serviceComponent.flattenToString()}"
+                this, "accessibility_tv_oem_link_preflight",
+                "resolved=none;candidates=none;service_found=false"
             )
-            return
         }
 
-        // Fallback for ROMs that do not implement the Android TV OEM link.
+        // Fallback only when the TV OEM link cannot be launched.
         val fallbackOpened = runCatching {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             true
@@ -169,13 +199,13 @@ class AccessibilitySetupActivity : Activity() {
             false
         }
         lastLaunchRoute = if (fallbackOpened) {
-            "página geral de Acessibilidade (a ROM não disponibilizou a página específica)"
+            "página geral de Acessibilidade (fallback)"
         } else {
             "não foi possível abrir as Definições Android"
         }
         DiagnosticsFeature.record(
             this, "accessibility_authorization_settings_opened",
-            "tv_oem_link_opened=$tvSettingsOpened,general_settings_opened=$fallbackOpened,service_found=${serviceInfo != null}"
+            "tv_oem_link_launch_accepted=false,general_settings_opened=$fallbackOpened,service_found=${serviceInfo != null}"
         )
         if (!fallbackOpened) {
             AlertDialog.Builder(this)
@@ -219,5 +249,6 @@ class AccessibilitySetupActivity : Activity() {
             "android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK"
         private const val TV_ACCESSIBILITY_SERVICE_INFO_EXTRA =
             "accessibilityServiceInfo"
+        private const val MAX_ACTIVITY_CANDIDATES = 8
     }
 }
