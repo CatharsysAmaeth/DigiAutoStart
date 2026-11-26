@@ -109,7 +109,7 @@ object DeviceAccessibilityInventory {
         val enabledIds = enabled.mapNotNull { serviceId(it) }.toSet()
         installed.forEachIndexed { index, info ->
             val si = info.resolveInfo.serviceInfo
-            lines += "accessibility_service[$index]=component=${si?.packageName}/${si?.name};id=${serviceId(info)};label=${runCatching { info.loadLabel(pm) }.getOrNull()};enabled=${serviceId(info) in enabledIds};feedback=${info.feedbackType};eventTypes=${info.eventTypes};flags=${info.flags};canRetrieveWindowContent=${info.canRetrieveWindowContent};settingsActivity=${runCatching { info.settingsActivityName }.getOrNull()}"
+            lines += "accessibility_service[$index]=component=${si?.packageName}/${si?.name};id=${serviceId(info)};label=${runCatching { info.resolveInfo.loadLabel(pm) }.getOrNull()};enabled=${serviceId(info) in enabledIds};feedback=${info.feedbackType};eventTypes=${info.eventTypes};flags=${info.flags};canRetrieveWindowContent=${info.canRetrieveWindowContent};settingsActivity=${runCatching { info.settingsActivityName }.getOrNull()}"
         }
         val secure = runCatching {
             Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
