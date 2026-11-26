@@ -122,19 +122,33 @@ jobs:
           set -euo pipefail
           APK="app/build/outputs/apk/android12/debug/app-android12-debug.apk"
           test -f "$APK"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
           MANIFEST="/tmp/android12-debug-manifest.txt"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > "$MANIFEST"
-          grep -Fq 'DigiTvAccessibilityProbeService' "$MANIFEST"
-          grep -Fq 'android.permission.BIND_ACCESSIBILITY_SERVICE' "$MANIFEST"
-          grep -Fq 'android.accessibilityservice.AccessibilityService' "$MANIFEST"
-          grep -Fq 'digi_tv_probe_accessibility' "$MANIFEST"
           XML="/tmp/digi-tv-probe-accessibility.txt"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" res/xml/digi_tv_probe_accessibility.xml > "$XML"
-          grep -Fq 'ro.digionline.tv' "$XML"
-          grep -Fq 'canRetrieveWindowContent' "$XML"
+
+          echo "=== APK identity ==="
+          "$AAPT" dump badging "$APK" | head -n 8
+          echo "=== Decoded Debug manifest ==="
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee "$MANIFEST"
+          echo "=== Accessibility configuration ==="
+          "$AAPT" dump xmltree "$APK" res/xml/digi_tv_probe_accessibility.xml | tee "$XML"
+
+          check_contains() {
+            local file="$1"
+            local needle="$2"
+            if ! grep -Fqi "$needle" "$file"; then
+              echo "::error::Missing '$needle' in $file"
+              return 1
+            fi
+          }
+
+          check_contains "$MANIFEST" 'DigiTvAccessibilityProbeService'
+          check_contains "$MANIFEST" 'BIND_ACCESSIBILITY_SERVICE'
+          check_contains "$MANIFEST" 'android.accessibilityservice.AccessibilityService'
+          check_contains "$MANIFEST" 'digi_tv_probe_accessibility'
+          check_contains "$XML" 'ro.digionline.tv'
+          check_contains "$XML" 'canRetrieveWindowContent'
           echo "Debug accessibility service and its configuration are present in the APK."
-          cat "$MANIFEST" | grep -A18 -B3 'DigiTvAccessibilityProbeService'
-          cat "$XML"
 
       - name: Verify both Release APKs and variant isolation
         shell: bash
