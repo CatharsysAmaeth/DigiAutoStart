@@ -13,6 +13,9 @@ object DebugMenuFeature {
         content.addView(button(activity, "Investigar DIGI TV (Debug)") {
             DigiTvProbeFeature.show(activity)
         }, params(activity, 12))
+        content.addView(button(activity, "Diagnosticar Acessibilidade (Debug)") {
+            AccessibilityServiceDiagnostic.run(activity)
+        }, params(activity, 12))
         content.addView(button(activity, "Verificar atualizações") {
             DebugUpdateFeature.check(activity)
         }, params(activity, 12))
