@@ -1,4 +1,4 @@
-# DAdA 0.6.5 acceptance and investigation test plan
+# DAdA 0.6.6 acceptance and investigation test plan
 
 ## T1 — Installation and upgrade
 
@@ -53,28 +53,28 @@
 
 ## T7 — Accessibility service registration preflight
 
-- Install Debug 0.6.5 over the existing Debug app; do not uninstall.
+- Install Debug 0.6.6 over the existing Debug app; do not uninstall.
 - Open the Debug menu and run "Diagnosticar Acessibilidade (Debug)".
 - Record PackageManager component lookup, accessibility-service intent discovery, metadata XML parsing, AccessibilityManager installed/enabled lists, and the secure enabled-services setting.
 - Review the result before opening Android Accessibility settings or asking the user to enable anything.
 - This diagnostic is read-only and must not modify secure settings or enable the service.
 
-## T8 — User-mediated accessibility setup
+## T8 — User-mediated accessibility setup route diagnosis
 
 - Open **Ativar observador DIGI TV (Debug)** from the Debug menu.
 - Read the disclosure and explicitly consent before opening Android settings.
-- Confirm DAdA first opens the Android TV service-specific confirmation screen titled for “Observador de interface DIGI TV (Debug)”, if the ROM exposes the AOSP TvSettings OEM link.
-- If that specific route is unavailable, confirm DAdA falls back to the general Accessibility page and reports the fallback honestly.
-- If the service-specific page opens, inspect the service name and enable it only after reading the system confirmation.
-- Return to DAdA, press “Actualizar estado”, and confirm the active state is reported only if Android lists the service as enabled.
-- Upload the opt-in diagnostic report so the recorded route and post-return state can be checked.
+- Press **Autorizar observador nas Definições Android** once.
+- Do not try to enable another accessibility service.
+- Return to DAdA and press **Actualizar estado**.
+- Upload the opt-in diagnostic report.
+- Review `accessibility_tv_oem_link_preflight` for `resolved` and `candidates`, and `accessibility_tv_oem_link_launch_accepted` for the launch result.
+- Treat the resolved component only as PackageManager's predicted destination; the visual screen still needs to be compared with the device result.
 - Do not enable TalkBack or Switch Access as a workaround.
 
 ## T9 — Accessibility observation
 
 - Enable Diagnostics collection in DAdA.
-- From the investigation screen, open Android Accessibility settings.
-- Manually enable “Observador de interface DIGI TV (Debug)”.
+- Manually enable “Observador de interface DIGI TV (Debug)” only if the service-specific Android confirmation is actually presented.
 - Open DIGI TV normally and wait for the initial screen to settle.
 - Record the initial highlighted “Ver mais” state.
 - Observe whether window-state, content-change, focus and selection events are emitted.
