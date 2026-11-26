@@ -9,7 +9,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <queries>\n        <package android:name="com.android.tv.settings" />\n        <package android:name="com.android.settings" />\n        <package android:name="com.google.android.marvin.talkback" />
+    <queries>
+        <package android:name="com.android.tv.settings" />
+        <package android:name="com.android.settings" />
+        <package android:name="com.google.android.marvin.talkback" />
         <intent>
             <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK" />
         </intent>
@@ -18,6 +21,33 @@
         </intent>
         <intent>
             <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_DETAILS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_MOTION_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_CONTRAST_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.REDUCE_BRIGHT_COLORS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="com.android.settings.ACCESSIBILITY_COLOR_SPACE_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.COLOR_INVERSION_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.TEXT_READING_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.CAPTIONING_SETTINGS" />
         </intent>
         <intent>
             <action android:name="android.settings.ACCESSIBILITY_CAPTION_TV_OEM_LINK" />
