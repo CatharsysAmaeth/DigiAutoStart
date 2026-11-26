@@ -145,7 +145,7 @@ jobs:
           check_contains "$MANIFEST" 'DigiTvAccessibilityProbeService'
           check_contains "$MANIFEST" 'BIND_ACCESSIBILITY_SERVICE'
           check_contains "$MANIFEST" 'android.accessibilityservice.AccessibilityService'
-          check_contains "$MANIFEST" 'digi_tv_probe_accessibility'
+          # aapt resolves the manifest resource reference to a numeric ID; verify the XML resource itself below.
           check_contains "$XML" 'ro.digionline.tv'
           check_contains "$XML" 'canRetrieveWindowContent'
           echo "Debug accessibility service and its configuration are present in the APK."
