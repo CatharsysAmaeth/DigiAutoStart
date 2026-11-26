@@ -1,6 +1,5 @@
 package pt.catharsys.digiautostart
 
-import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Activity
 import android.app.AlertDialog
@@ -18,11 +17,16 @@ import android.widget.TextView
 
 /**
  * Debug-only, user-mediated setup for the DIGI TV accessibility observer.
- * The app explains the scope and obtains in-app consent, then delegates the
- * actual enable/disable decision to Android Settings.
+ *
+ * On Android TV, first try the AOSP TV Settings OEM link that opens the
+ * selected service's own confirmation/toggle screen. If the ROM does not
+ * implement that hook, fall back to the standard Accessibility settings page.
+ * The system Settings UI remains responsible for the final user confirmation.
  */
 class AccessibilitySetupActivity : Activity() {
     private lateinit var status: TextView
+    private var lastLaunchRoute = "Ainda não foi aberta nenhuma página do sistema."
+
     private val serviceComponent by lazy {
         ComponentName(this, DigiTvAccessibilityProbeService::class.java)
     }
@@ -61,19 +65,17 @@ class AccessibilitySetupActivity : Activity() {
             setBackgroundColor(0xFF1D3038.toInt())
         }
         content.addView(status, params(18))
-        content.addView(actionButton("Autorizar e abrir Definições Android") {
+        content.addView(actionButton("Autorizar observador nas Definições Android") {
             AlertDialog.Builder(this)
                 .setTitle("Confirmar autorização")
                 .setMessage(
-                    "Confirmas que compreendes o acesso descrito e queres abrir as Definições Android para activar manualmente o Observador de interface DIGI TV (Debug)? O DAdA não consegue activar o serviço por ti."
+                    "Confirmas que compreendes o acesso descrito e queres abrir a confirmação do Android para activar manualmente o Observador de interface DIGI TV (Debug)? A autorização final será sempre confirmada nas Definições do sistema."
                 )
                 .setNegativeButton("Cancelar", null)
                 .setPositiveButton("Continuar") { _, _ -> openSystemAuthorization() }
                 .show()
         }, params(12))
-        content.addView(actionButton("Resolução avançada (experimental)") {
-            runAdvancedRecovery()
-        }, params(12))
+        content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
         content.addView(actionButton("Voltar") { finish() }, params(8))
         setContentView(ScrollView(this).apply {
             isFillViewport = true
@@ -103,11 +105,12 @@ class AccessibilitySetupActivity : Activity() {
             append("Serviço instalado: "); append(if (installed) "sim" else "não")
             append("\nAutorização do Android: ")
             append(if (active && secureEnabled) "activa" else "inactiva")
+            append("\nÚltimo encaminhamento: "); append(lastLaunchRoute)
             append("\nA autorização final é sempre gerida pelo Android.")
         }
         DiagnosticsFeature.record(
             this, "accessibility_setup_status",
-            "installed=$installed,active=$active,secure_enabled=$secureEnabled"
+            "installed=$installed,active=$active,secure_enabled=$secureEnabled,route=$lastLaunchRoute"
         )
     }
 
@@ -118,53 +121,69 @@ class AccessibilitySetupActivity : Activity() {
         } == true
 
     private fun openSystemAuthorization() {
-        val detailsIntent = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").apply {
-            putExtra(Intent.EXTRA_COMPONENT_NAME, serviceComponent.flattenToString())
+        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        val serviceInfo = runCatching {
+            manager?.installedAccessibilityServiceList.orEmpty().firstOrNull { matches(it) }
+        }.getOrNull()
+
+        // AOSP Android TV Settings exposes this exported OEM hook specifically
+        // to open one installed accessibility service's own confirmation page.
+        // The extra name and Parcelable type are defined by TvSettings.
+        val tvServiceIntent = serviceInfo?.let {
+            Intent(TV_ACCESSIBILITY_SERVICE_ACTION).apply {
+                putExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA, it)
+            }
         }
-        val opened = runCatching {
-            if (detailsIntent.resolveActivity(packageManager) != null) {
-                startActivity(detailsIntent)
+
+        val tvSettingsOpened = tvServiceIntent?.let { intent ->
+            runCatching {
+                startActivity(intent)
                 true
-            } else false
-        }.getOrDefault(false)
-        if (!opened) {
-            runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
-                .onFailure {
-                    AlertDialog.Builder(this)
-                        .setTitle("Definições indisponíveis")
-                        .setMessage("Não foi possível abrir as Definições de Acessibilidade nesta ROM.")
-                        .setPositiveButton("OK", null)
-                        .show()
-                }
+            }.getOrElse { error ->
+                DiagnosticsFeature.record(
+                    this, "accessibility_tv_oem_link_failed",
+                    "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)}"
+                )
+                false
+            }
+        } ?: false
+
+        if (tvSettingsOpened) {
+            lastLaunchRoute = "página específica do serviço Android TV"
+            DiagnosticsFeature.record(
+                this, "accessibility_tv_oem_link_opened",
+                "action=$TV_ACCESSIBILITY_SERVICE_ACTION,component=${serviceComponent.flattenToString()}"
+            )
+            return
+        }
+
+        // Fallback for ROMs that do not implement the Android TV OEM link.
+        val fallbackOpened = runCatching {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            true
+        }.getOrElse { error ->
+            DiagnosticsFeature.record(
+                this, "accessibility_general_settings_failed",
+                "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)}"
+            )
+            false
+        }
+        lastLaunchRoute = if (fallbackOpened) {
+            "página geral de Acessibilidade (a ROM não disponibilizou a página específica)"
+        } else {
+            "não foi possível abrir as Definições Android"
         }
         DiagnosticsFeature.record(
             this, "accessibility_authorization_settings_opened",
-            "details_intent_opened=$opened"
+            "tv_oem_link_opened=$tvSettingsOpened,general_settings_opened=$fallbackOpened,service_found=${serviceInfo != null}"
         )
-    }
-
-    private fun runAdvancedRecovery() {
-        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
-        val installed = runCatching {
-            manager?.installedAccessibilityServiceList.orEmpty().any { matches(it) }
-        }.getOrDefault(false)
-        DiagnosticsFeature.record(
-            this, "accessibility_advanced_recovery_requested",
-            "service_visible_to_accessibility_manager=$installed"
-        )
-        val explanation = if (installed) {
-            "O Android reconhece o serviço como instalado, mas a ROM pode não o apresentar na sua página de Acessibilidade. Vou tentar abrir primeiro a página específica do serviço e, se não existir, a página geral. A activação continua a exigir a tua confirmação no Android."
-        } else {
-            "O Android não está a devolver o serviço na lista de serviços instalados. Não existe uma forma segura de o activar à força. Podes abrir as Definições gerais para confirmar o estado."
+        if (!fallbackOpened) {
+            AlertDialog.Builder(this)
+                .setTitle("Definições indisponíveis")
+                .setMessage("Não foi possível abrir as Definições de Acessibilidade nesta ROM.")
+                .setPositiveButton("OK", null)
+                .show()
         }
-        AlertDialog.Builder(this)
-            .setTitle("Resolução avançada")
-            .setMessage(
-                "$explanation\n\nEste modo não altera definições protegidas, não usa root e não contorna a autorização do Android."
-            )
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Tentar abrir Definições") { _, _ -> openSystemAuthorization() }
-            .show()
     }
 
     private fun label(value: String, size: Float, bold: Boolean = false) =
@@ -194,4 +213,11 @@ class AccessibilitySetupActivity : Activity() {
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val TV_ACCESSIBILITY_SERVICE_ACTION =
+            "android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK"
+        private const val TV_ACCESSIBILITY_SERVICE_INFO_EXTRA =
+            "accessibilityServiceInfo"
+    }
 }
