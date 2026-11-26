@@ -76,6 +76,12 @@ class AccessibilitySetupActivity : Activity() {
                 .setPositiveButton("Continuar") { _, _ -> openSystemAuthorization() }
                 .show()
         }, params(12))
+        content.addView(actionButton("Abrir acessibilidade geral da TV (diagnóstico)") {
+            openGeneralTvAccessibility()
+        }, params(8))
+        content.addView(actionButton("Abrir autorização específica (destino directo)") {
+            confirmAndOpenSpecificAuthorizationDirect()
+        }, params(8))
         content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
         content.addView(actionButton("Voltar") { finish() }, params(8))
         setContentView(ScrollView(this).apply {
@@ -123,6 +129,99 @@ class AccessibilitySetupActivity : Activity() {
 
     private fun describeActivity(component: ComponentName?): String =
         component?.let { "${it.packageName}/${it.className}" } ?: "none"
+
+    private fun confirmAndOpenSpecificAuthorizationDirect() {
+        AlertDialog.Builder(this)
+            .setTitle("Confirmar autorização")
+            .setMessage(
+                "A DAdA vai abrir directamente a actividade de autorização do serviço, se a ROM a disponibilizar. A autorização final continua a exigir a tua confirmação nas Definições Android."
+            )
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Continuar") { _, _ -> openSpecificAuthorizationDirect() }
+            .show()
+    }
+
+    private fun openSpecificAuthorizationDirect() {
+        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        val serviceInfo = runCatching {
+            manager?.installedAccessibilityServiceList.orEmpty().firstOrNull { matches(it) }
+        }.getOrNull()
+        val resolved = runCatching {
+            val probe = Intent(TV_ACCESSIBILITY_SERVICE_ACTION)
+            packageManager.resolveActivity(probe, PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+        }.getOrNull()
+
+        val details = "service=${serviceComponent.flattenToString()};service_found=${serviceInfo != null};destination=${describeActivity(resolved)}"
+        DiagnosticsFeature.record(this, "accessibility_tv_oem_direct_preflight", details)
+
+        if (serviceInfo == null || resolved == null) {
+            lastLaunchRoute = "destino directo indisponível; service_found=${serviceInfo != null}; destination=${describeActivity(resolved)}"
+            refreshStatus()
+            return
+        }
+
+        val intent = Intent(TV_ACCESSIBILITY_SERVICE_ACTION).apply {
+            component = resolved
+            putExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA, serviceInfo)
+        }
+        val opened = runCatching {
+            startActivity(intent)
+            true
+        }.getOrElse { error ->
+            DiagnosticsFeature.record(
+                this, "accessibility_tv_oem_direct_failed",
+                "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)};$details"
+            )
+            false
+        }
+        lastLaunchRoute = if (opened) {
+            "pedido directo enviado a ${describeActivity(resolved)}"
+        } else {
+            "falha ao abrir destino directo ${describeActivity(resolved)}"
+        }
+        DiagnosticsFeature.record(
+            this, "accessibility_tv_oem_direct_result",
+            "opened=$opened;$details"
+        )
+    }
+
+    private fun openGeneralTvAccessibility() {
+        val intent = Intent(TV_ACCESSIBILITY_GENERAL_ACTION)
+        val resolved = runCatching {
+            packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+        }.getOrNull()
+        val candidates = runCatching {
+            packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                .mapNotNull { item -> item.activityInfo?.let {
+                    "${it.packageName}/${it.name}:exported=${it.exported}:enabled=${it.enabled}:permission=${it.permission.orEmpty()}"
+                } }.distinct().take(MAX_ACTIVITY_CANDIDATES)
+        }.getOrDefault(emptyList())
+        DiagnosticsFeature.record(
+            this, "accessibility_tv_general_preflight",
+            "resolved=${describeActivity(resolved)};candidates=${candidates.joinToString(",")}"
+        )
+        val opened = runCatching {
+            startActivity(intent)
+            true
+        }.getOrElse { error ->
+            DiagnosticsFeature.record(
+                this, "accessibility_tv_general_failed",
+                "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)}"
+            )
+            false
+        }
+        lastLaunchRoute = if (opened) {
+            "página geral TV; destino: ${describeActivity(resolved)}"
+        } else {
+            "não foi possível abrir a página geral TV"
+        }
+        DiagnosticsFeature.record(
+            this, "accessibility_tv_general_result",
+            "opened=$opened;resolved=${describeActivity(resolved)};candidates=${candidates.joinToString(",")}"
+        )
+    }
 
     private fun openSystemAuthorization() {
         val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
@@ -249,6 +348,8 @@ class AccessibilitySetupActivity : Activity() {
             "android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK"
         private const val TV_ACCESSIBILITY_SERVICE_INFO_EXTRA =
             "accessibilityServiceInfo"
+        private const val TV_ACCESSIBILITY_GENERAL_ACTION =
+            "android.settings.ACCESSIBILITY_TV_OEM_LINK"
         private const val MAX_ACTIVITY_CANDIDATES = 8
     }
 }
