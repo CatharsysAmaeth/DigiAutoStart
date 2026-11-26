@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Parcel
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.accessibility.AccessibilityManager
@@ -39,7 +41,27 @@ class AccessibilitySetupActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        DiagnosticsFeature.record(
+            this, "accessibility_setup_activity_resumed",
+            "elapsed_realtime_ms=${SystemClock.elapsedRealtime()};last_route=$lastLaunchRoute"
+        )
         if (::status.isInitialized) refreshStatus()
+    }
+
+    override fun onPause() {
+        DiagnosticsFeature.record(
+            this, "accessibility_setup_activity_paused",
+            "elapsed_realtime_ms=${SystemClock.elapsedRealtime()};last_route=$lastLaunchRoute"
+        )
+        super.onPause()
+    }
+
+    override fun onStop() {
+        DiagnosticsFeature.record(
+            this, "accessibility_setup_activity_stopped",
+            "elapsed_realtime_ms=${SystemClock.elapsedRealtime()};last_route=$lastLaunchRoute"
+        )
+        super.onStop()
     }
 
     private fun render() {
@@ -155,7 +177,42 @@ class AccessibilitySetupActivity : Activity() {
                 ?.activityInfo?.let { ComponentName(it.packageName, it.name) }
         }.getOrNull()
 
-        val details = "service=${serviceComponent.flattenToString()};service_found=${serviceInfo != null};destination=${describeActivity(resolved)}"
+        val originalId = runCatching { serviceInfo?.id }.getOrNull()
+        val originalComponent = serviceInfo?.resolveInfo?.serviceInfo?.let {
+            "${it.packageName}/${it.name}"
+        } ?: "none"
+        val originalSettingsActivity = runCatching {
+            serviceInfo?.settingsActivityName
+        }.getOrNull()
+
+        // Android 12 AccessibilityServiceInfo.equals() compares the generated
+        // service ID. Verify that Parcelable transport preserves that ID and
+        // that TvSettings' installed-service membership check would succeed.
+        val parcelCheck = runCatching {
+            requireNotNull(serviceInfo)
+            val parcel = Parcel.obtain()
+            try {
+                parcel.writeParcelable(serviceInfo, 0)
+                parcel.setDataPosition(0)
+                val restored = parcel.readParcelable<AccessibilityServiceInfo>(
+                    AccessibilityServiceInfo::class.java.classLoader
+                )
+                val installedAgain = manager?.installedAccessibilityServiceList.orEmpty()
+                val restoredId = restored?.id
+                val restoredComponent = restored?.resolveInfo?.serviceInfo?.let {
+                    "${it.packageName}/${it.name}"
+                } ?: "none"
+                val equalsOriginal = restored == serviceInfo
+                val contained = restored != null && installedAgain.contains(restored)
+                "parcel_ok=${restored != null};original_id=$originalId;restored_id=$restoredId;id_match=${originalId == restoredId};original_component=$originalComponent;restored_component=$restoredComponent;component_match=${originalComponent == restoredComponent};equals_original=$equalsOriginal;installed_contains_restored=$contained;settings_activity=$originalSettingsActivity"
+            } finally {
+                parcel.recycle()
+            }
+        }.getOrElse { error ->
+            "parcel_error=${error.javaClass.simpleName}:${error.message.orEmpty().take(120)};original_id=$originalId;original_component=$originalComponent;settings_activity=$originalSettingsActivity"
+        }
+
+        val details = "service=${serviceComponent.flattenToString()};service_found=${serviceInfo != null};destination=${describeActivity(resolved)};$parcelCheck"
         DiagnosticsFeature.record(this, "accessibility_tv_oem_direct_preflight", details)
 
         if (serviceInfo == null || resolved == null) {
@@ -168,6 +225,10 @@ class AccessibilitySetupActivity : Activity() {
             component = resolved
             putExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA, serviceInfo)
         }
+        DiagnosticsFeature.record(
+            this, "accessibility_tv_oem_direct_intent_ready",
+            "action=${intent.action};component=${describeActivity(intent.component)};has_extra=${intent.hasExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA)};extra_key=$TV_ACCESSIBILITY_SERVICE_INFO_EXTRA;$parcelCheck"
+        )
         val opened = runCatching {
             startActivity(intent)
             true
@@ -185,7 +246,7 @@ class AccessibilitySetupActivity : Activity() {
         }
         DiagnosticsFeature.record(
             this, "accessibility_tv_oem_direct_result",
-            "opened=$opened;$details"
+            "opened=$opened;elapsed_realtime_ms=${SystemClock.elapsedRealtime()};$details"
         )
     }
 
