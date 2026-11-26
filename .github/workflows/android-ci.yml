@@ -116,6 +116,26 @@ jobs:
           export DADA_DEBUG_REPORT_PASSWORD_B64="$(printf '%s' "$DADA_DEBUG_REPORT_PASSWORD" | base64 -w 0)"
           gradle --no-daemon --stacktrace testAndroid12DebugUnitTest assembleAndroid12Debug assembleAndroid12Release assembleAndroid9Release
 
+      - name: Verify Debug accessibility service is packaged
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/android12/debug/app-android12-debug.apk"
+          test -f "$APK"
+          MANIFEST="/tmp/android12-debug-manifest.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > "$MANIFEST"
+          grep -Fq 'DigiTvAccessibilityProbeService' "$MANIFEST"
+          grep -Fq 'android.permission.BIND_ACCESSIBILITY_SERVICE' "$MANIFEST"
+          grep -Fq 'android.accessibilityservice.AccessibilityService' "$MANIFEST"
+          grep -Fq 'digi_tv_probe_accessibility' "$MANIFEST"
+          XML="/tmp/digi-tv-probe-accessibility.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" res/xml/digi_tv_probe_accessibility.xml > "$XML"
+          grep -Fq 'ro.digionline.tv' "$XML"
+          grep -Fq 'canRetrieveWindowContent' "$XML"
+          echo "Debug accessibility service and its configuration are present in the APK."
+          cat "$MANIFEST" | grep -A18 -B3 'DigiTvAccessibilityProbeService'
+          cat "$XML"
+
       - name: Verify both Release APKs and variant isolation
         shell: bash
         run: |
