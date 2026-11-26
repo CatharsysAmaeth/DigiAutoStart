@@ -139,6 +139,23 @@ object DiagnosticsFeature {
                         "android_release=${Build.VERSION.RELEASE}\n" +
                         "device_model=${Build.MODEL}\n" +
                         "manufacturer=${Build.MANUFACTURER}\n" +
+                        "brand=${Build.BRAND}\n" +
+                        "device=${Build.DEVICE}\n" +
+                        "product=${Build.PRODUCT}\n" +
+                        "board=${Build.BOARD}\n" +
+                        "hardware=${Build.HARDWARE}\n" +
+                        "bootloader=${Build.BOOTLOADER}\n" +
+                        "build_fingerprint=${Build.FINGERPRINT}\n" +
+                        "build_id=${Build.ID}\n" +
+                        "build_incremental=${Build.VERSION.INCREMENTAL}\n" +
+                        "build_display=${Build.DISPLAY}\n" +
+                        "build_type=${Build.TYPE}\n" +
+                        "build_tags=${Build.TAGS}\n" +
+                        "security_patch=${Build.VERSION.SECURITY_PATCH}\n" +
+                        "base_os=${Build.VERSION.BASE_OS}\n" +
+                        "supported_abis=${Build.SUPPORTED_ABIS.joinToString(",")}\n" +
+                        "supported_32_bit_abis=${Build.SUPPORTED_32_BIT_ABIS.joinToString(",")}\n" +
+                        "supported_64_bit_abis=${Build.SUPPORTED_64_BIT_ABIS.joinToString(",")}\n" +
                         "target_package=${TargetAppResolver.selectedPackage(activity) ?: "not_detected"}\n" +
                         "screen_broadcasts_are_observations_not_proof_of_standby_or_wake\n"
                 )
