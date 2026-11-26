@@ -34,6 +34,8 @@ The Debug menu provides **Ativar observador DIGI TV (Debug)**. Its setup screen:
 - asks for explicit in-app consent before opening Android settings;
 - tries the service-specific accessibility details screen where the ROM supports it, then falls back to the general Accessibility settings page;
 - checks the installed and enabled state again when the user returns to DAdA; and
-- offers **Resolução avançada (experimental)**, which retries the supported settings routes and records diagnostics only.
+- tries the Android TV service-specific confirmation route first, records whether that route could be launched, and falls back only when it is unavailable.
 
-The setup screen never writes Settings.Secure, uses root/ADB, injects input, or bypasses Android's system confirmation. In-app consent is additional disclosure, not a substitute for the system-level authorization. This flow and the observer are Debug-only.
+On Android TV, the setup screen first tries the AOSP TvSettings OEM link `android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK`, passing the installed `AccessibilityServiceInfo` in the `accessibilityServiceInfo` extra. In AOSP TvSettings this exported route opens the selected service's own confirmation/toggle screen. If the ROM does not implement that OEM hook, the app falls back to the standard Accessibility settings page.
+
+The setup screen never writes Settings.Secure, uses root/ADB, injects input, or bypasses Android's system confirmation. In-app consent is additional disclosure, not a substitute for the system-level authorization. The direct TV Settings route is an AOSP OEM hook, not a public Android SDK guarantee; device support must be verified at runtime. This flow and the observer are Debug-only.
