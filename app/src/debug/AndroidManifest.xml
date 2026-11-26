@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <queries>
+    <queries>\n        <package android:name="com.android.tv.settings" />\n        <package android:name="com.android.settings" />\n        <package android:name="com.google.android.marvin.talkback" />
         <intent>
             <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK" />
         </intent>
