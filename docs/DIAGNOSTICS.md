@@ -25,3 +25,15 @@ This read-only check records:
 - whether Android's enabled-accessibility-services secure setting contains the component.
 
 The check never enables/disables a service, writes secure settings, injects input, or opens Accessibility settings. Use its result to distinguish APK/PackageManager registration problems from AccessibilityManager or Settings UI discovery problems. Do not ask the user to repeat the settings check until the preflight result has been reviewed.
+
+
+## User-mediated accessibility setup
+
+The Debug menu provides **Ativar observador DIGI TV (Debug)**. Its setup screen:
+- explains the observer's limited package scope and the kind of UI information it can read;
+- asks for explicit in-app consent before opening Android settings;
+- tries the service-specific accessibility details screen where the ROM supports it, then falls back to the general Accessibility settings page;
+- checks the installed and enabled state again when the user returns to DAdA; and
+- offers **Resolução avançada (experimental)**, which retries the supported settings routes and records diagnostics only.
+
+The setup screen never writes Settings.Secure, uses root/ADB, injects input, or bypasses Android's system confirmation. In-app consent is additional disclosure, not a substitute for the system-level authorization. This flow and the observer are Debug-only.
