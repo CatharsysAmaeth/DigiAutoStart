@@ -1,4 +1,4 @@
-# DAdA 0.6.3 acceptance and investigation test plan
+# DAdA 0.6.4 acceptance and investigation test plan
 
 ## T1 — Installation and upgrade
 
@@ -53,13 +53,22 @@
 
 ## T7 — Accessibility service registration preflight
 
-- Install Debug 0.6.3 over the existing Debug 0.6.2 app; do not uninstall.
+- Install Debug 0.6.4 over the existing Debug 0.6.3 app; do not uninstall.
 - Open the Debug menu and run "Diagnosticar Acessibilidade (Debug)".
 - Record PackageManager component lookup, accessibility-service intent discovery, metadata XML parsing, AccessibilityManager installed/enabled lists, and the secure enabled-services setting.
 - Review the result before opening Android Accessibility settings or asking the user to enable anything.
 - This diagnostic is read-only and must not modify secure settings or enable the service.
 
-## T8 — Accessibility observation
+## T8 — User-mediated accessibility setup
+
+- Open **Ativar observador DIGI TV (Debug)** from the Debug menu.
+- Read the disclosure and explicitly consent before opening Android settings.
+- Confirm DAdA attempts the service-specific settings route and safely falls back to general Accessibility settings.
+- If the service is not listed, use **Resolução avançada (experimental)** once; confirm it only retries supported settings routes and does not change protected settings.
+- Return to DAdA and confirm the installed/active state is refreshed.
+- Do not enable TalkBack or Switch Access as a workaround.
+
+## T9 — Accessibility observation
 
 - Enable Diagnostics collection in DAdA.
 - From the investigation screen, open Android Accessibility settings.
@@ -71,7 +80,7 @@
 - Navigate manually with DOWN, DOWN, OK and record the corresponding focus/selection changes and resulting channel screen.
 - Disable the accessibility observer after the test if no longer needed.
 
-## T9 — Variable startup timing
+## T10 — Variable startup timing
 
 - With Diagnostics and the accessibility observer enabled, open DIGI TV normally five times.
 - For each run, record the first DIGI TV window event, the first non-empty view-tree snapshot, the initial “Ver mais” highlight and the first observed live-channel/player state.
@@ -79,7 +88,7 @@
 - Do not use a fixed delay as a proxy for readiness; derive timing from observed UI events.
 - Record any run where the accessibility tree is unavailable or incomplete.
 
-## T10 — Release isolation and privacy
+## T11 — Release isolation and privacy
 
 - Confirm the normal Release has no Debug menu, diagnostic collection, DIGI TV accessibility observer or internal test-update tools.
 - Confirm Release does not request Debug-only internet, package-install or accessibility-service declarations.
