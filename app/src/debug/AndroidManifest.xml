@@ -19,6 +19,12 @@
         <intent>
             <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
         </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_CAPTION_TV_OEM_LINK" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_CORRECTION_TV_OEM_LINK" />
+        </intent>
     </queries>
 
     <application>
