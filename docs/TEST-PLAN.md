@@ -1,4 +1,4 @@
-# DAdA 0.6.1 acceptance and investigation test plan
+# DAdA 0.6.3 acceptance and investigation test plan
 
 ## T1 — Installation and upgrade
 
@@ -51,7 +51,15 @@
 - Compare with “Abrir DIGI TV normalmente”.
 - Record whether either route reaches the initial screen, channel 1, an error, or another screen.
 
-## T7 — Accessibility observation
+## T7 — Accessibility service registration preflight
+
+- Install Debug 0.6.3 over the existing Debug 0.6.2 app; do not uninstall.
+- Open the Debug menu and run "Diagnosticar Acessibilidade (Debug)".
+- Record PackageManager component lookup, accessibility-service intent discovery, metadata XML parsing, AccessibilityManager installed/enabled lists, and the secure enabled-services setting.
+- Review the result before opening Android Accessibility settings or asking the user to enable anything.
+- This diagnostic is read-only and must not modify secure settings or enable the service.
+
+## T8 — Accessibility observation
 
 - Enable Diagnostics collection in DAdA.
 - From the investigation screen, open Android Accessibility settings.
@@ -63,7 +71,7 @@
 - Navigate manually with DOWN, DOWN, OK and record the corresponding focus/selection changes and resulting channel screen.
 - Disable the accessibility observer after the test if no longer needed.
 
-## T8 — Variable startup timing
+## T9 — Variable startup timing
 
 - With Diagnostics and the accessibility observer enabled, open DIGI TV normally five times.
 - For each run, record the first DIGI TV window event, the first non-empty view-tree snapshot, the initial “Ver mais” highlight and the first observed live-channel/player state.
@@ -71,7 +79,7 @@
 - Do not use a fixed delay as a proxy for readiness; derive timing from observed UI events.
 - Record any run where the accessibility tree is unavailable or incomplete.
 
-## T9 — Release isolation and privacy
+## T10 — Release isolation and privacy
 
 - Confirm the normal Release has no Debug menu, diagnostic collection, DIGI TV accessibility observer or internal test-update tools.
 - Confirm Release does not request Debug-only internet, package-install or accessibility-service declarations.
