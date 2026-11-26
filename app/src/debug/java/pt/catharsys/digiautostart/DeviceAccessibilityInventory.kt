@@ -29,6 +29,8 @@ object DeviceAccessibilityInventory {
         Route("Detalhes de serviço (API oculta)", "android.settings.ACCESSIBILITY_DETAILS_SETTINGS", Intent.EXTRA_COMPONENT_NAME),
         Route("Configuração de atalhos", "android.settings.ACCESSIBILITY_SHORTCUT_SETTINGS"),
         Route("Acessibilidade geral Android TV OEM", "android.settings.ACCESSIBILITY_TV_OEM_LINK"),
+        Route("Legendas Android TV OEM", "android.settings.ACCESSIBILITY_CAPTION_TV_OEM_LINK"),
+        Route("Correcção de cor Android TV OEM", "android.settings.ACCESSIBILITY_COLOR_CORRECTION_TV_OEM_LINK"),
         Route("Autorização específica Android TV OEM", "android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK", "accessibilityServiceInfo"),
         Route("Cor e movimento", "android.settings.ACCESSIBILITY_COLOR_MOTION_SETTINGS"),
         Route("Contraste de cor", "android.settings.ACCESSIBILITY_COLOR_CONTRAST_SETTINGS"),
@@ -122,6 +124,18 @@ object DeviceAccessibilityInventory {
         add("accessibility_button_target", runCatching {
             Settings.Secure.getString(context.contentResolver, "accessibility_button_target_component")
         }.getOrNull())
+        listOf(
+            "accessibility_button_targets",
+            "accessibility_gesture_targets",
+            "accessibility_qs_targets",
+            "accessibility_shortcut_dialog_shown",
+            "touch_exploration_enabled",
+            "accessibility_display_magnification_enabled"
+        ).forEach { key ->
+            add("secure_$key", runCatching {
+                Settings.Secure.getString(context.contentResolver, key)
+            }.getOrNull())
+        }
 
         lines += "=== ROTAS / ACTIVIDADES DE DEFINIÇÕES ==="
         routes.forEach { route ->
