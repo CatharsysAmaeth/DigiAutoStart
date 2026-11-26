@@ -1,6 +1,7 @@
 package pt.catharsys.digiautostart
 
 import android.app.Activity
+import android.content.Intent
 import android.widget.Button
 import android.widget.LinearLayout
 
@@ -9,6 +10,9 @@ object DebugMenuFeature {
     fun addButtons(activity: Activity, content: LinearLayout, onSaved: () -> Unit) {
         content.addView(button(activity, "Configurar") {
             AutomationFeature.configure(activity, onSaved)
+        }, params(activity, 12))
+        content.addView(button(activity, "Ativar observador DIGI TV (Debug)") {
+            activity.startActivity(Intent(activity, AccessibilitySetupActivity::class.java))
         }, params(activity, 12))
         content.addView(button(activity, "Investigar DIGI TV (Debug)") {
             DigiTvProbeFeature.show(activity)
