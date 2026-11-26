@@ -82,7 +82,10 @@ class AccessibilitySetupActivity : Activity() {
         content.addView(actionButton("Abrir autorização específica (destino directo)") {
             confirmAndOpenSpecificAuthorizationDirect()
         }, params(8))
-        content.addView(actionButton("Inventário técnico completo (Android + Acessibilidade)") {\n            DeviceAccessibilityInventory.run(this)\n        }, params(8))\n        content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
+        content.addView(actionButton("Inventário técnico completo (Android + Acessibilidade)") {
+            DeviceAccessibilityInventory.run(this)
+        }, params(8))
+        content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
         content.addView(actionButton("Voltar") { finish() }, params(8))
         setContentView(ScrollView(this).apply {
             isFillViewport = true
@@ -110,10 +113,13 @@ class AccessibilitySetupActivity : Activity() {
         }.getOrDefault(false)
         status.text = buildString {
             append("Serviço instalado: "); append(if (installed) "sim" else "não")
-            append("\nAutorização do Android: ")
+            append("
+Autorização do Android: ")
             append(if (active && secureEnabled) "activa" else "inactiva")
-            append("\nÚltimo encaminhamento: "); append(lastLaunchRoute)
-            append("\nA autorização final é sempre gerida pelo Android.")
+            append("
+Último encaminhamento: "); append(lastLaunchRoute)
+            append("
+A autorização final é sempre gerida pelo Android.")
         }
         DiagnosticsFeature.record(
             this, "accessibility_setup_status",
