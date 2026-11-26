@@ -8,6 +8,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <queries>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK" />
+        </intent>
+    </queries>
+
     <application>
         <activity
             android:name=".AccessibilitySetupActivity"
@@ -43,8 +50,10 @@
             android:name=".AutomationBootReceiver"
             android:enabled="true"
             android:exported="false">
-            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
     </application>
 </manifest>
