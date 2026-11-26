@@ -113,13 +113,10 @@ class AccessibilitySetupActivity : Activity() {
         }.getOrDefault(false)
         status.text = buildString {
             append("Serviço instalado: "); append(if (installed) "sim" else "não")
-            append("
-Autorização do Android: ")
+            append("\nAutorização do Android: ")
             append(if (active && secureEnabled) "activa" else "inactiva")
-            append("
-Último encaminhamento: "); append(lastLaunchRoute)
-            append("
-A autorização final é sempre gerida pelo Android.")
+            append("\nÚltimo encaminhamento: "); append(lastLaunchRoute)
+            append("\nA autorização final é sempre gerida pelo Android.")
         }
         DiagnosticsFeature.record(
             this, "accessibility_setup_status",
