@@ -82,7 +82,7 @@ class AccessibilitySetupActivity : Activity() {
         content.addView(actionButton("Abrir autorização específica (destino directo)") {
             confirmAndOpenSpecificAuthorizationDirect()
         }, params(8))
-        content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
+        content.addView(actionButton("Inventário técnico completo (Android + Acessibilidade)") {\n            DeviceAccessibilityInventory.run(this)\n        }, params(8))\n        content.addView(actionButton("Actualizar estado") { refreshStatus() }, params(8))
         content.addView(actionButton("Voltar") { finish() }, params(8))
         setContentView(ScrollView(this).apply {
             isFillViewport = true
