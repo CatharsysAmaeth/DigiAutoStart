@@ -12,7 +12,6 @@ Diagnostic collection is intended only for internal development and device testi
 
 Do not commit diagnostic reports, credentials, signing material, internal service locations or personal/network information.
 
-
 ## Accessibility service registration preflight
 
 Before asking the user to open Android Accessibility settings, run **Diagnosticar Acessibilidade (Debug)** from the DAdA Debug menu.
@@ -26,16 +25,22 @@ This read-only check records:
 
 The check never enables/disables a service, writes secure settings, injects input, or opens Accessibility settings. Use its result to distinguish APK/PackageManager registration problems from AccessibilityManager or Settings UI discovery problems. Do not ask the user to repeat the settings check until the preflight result has been reviewed.
 
-
 ## User-mediated accessibility setup
 
 The Debug menu provides **Ativar observador DIGI TV (Debug)**. Its setup screen:
 - explains the observer's limited package scope and the kind of UI information it can read;
 - asks for explicit in-app consent before opening Android settings;
-- tries the service-specific accessibility details screen where the ROM supports it, then falls back to the general Accessibility settings page;
 - checks the installed and enabled state again when the user returns to DAdA; and
-- tries the Android TV service-specific confirmation route first, records whether that route could be launched, and falls back only when it is unavailable.
+- tries the Android TV service-specific route before falling back to the general Accessibility page only if the service cannot be found or the route cannot be launched.
 
-On Android TV, the setup screen first tries the AOSP TvSettings OEM link `android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK`, passing the installed `AccessibilityServiceInfo` in the `accessibilityServiceInfo` extra. In AOSP TvSettings this exported route opens the selected service's own confirmation/toggle screen. If the ROM does not implement that OEM hook, the app falls back to the standard Accessibility settings page.
+On Android TV, the setup screen tries the AOSP TvSettings OEM link `android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK`, passing the installed `AccessibilityServiceInfo` in the `accessibilityServiceInfo` extra. This is an AOSP OEM hook, not a public Android SDK guarantee. A successful `startActivity()` call means only that Android accepted the launch request; it does not prove that the service-specific screen was displayed.
 
-The setup screen never writes Settings.Secure, uses root/ADB, injects input, or bypasses Android's system confirmation. In-app consent is additional disclosure, not a substitute for the system-level authorization. The direct TV Settings route is an AOSP OEM hook, not a public Android SDK guarantee; device support must be verified at runtime. This flow and the observer are Debug-only.
+Debug 0.6.6 records a read-only PackageManager preflight before launching the route:
+- the activity selected by `resolveActivity()`;
+- the matching exported activities visible to PackageManager;
+- the accessibility service ID and component; and
+- whether the launch request was accepted or threw an exception.
+
+The resolved activity is evidence of PackageManager routing, not proof of the final screen rendered by a vendor Settings application. The app does not attempt to inspect or control another app's private UI. The next report should let us distinguish an unresolved OEM hook, a handler in the ZTE Settings package, or a handler in AOSP TvSettings.
+
+The setup screen never writes Settings.Secure, uses root/ADB, injects input, or bypasses Android's system confirmation. In-app consent is additional disclosure, not a substitute for system-level authorization. This flow and the observer are Debug-only.
