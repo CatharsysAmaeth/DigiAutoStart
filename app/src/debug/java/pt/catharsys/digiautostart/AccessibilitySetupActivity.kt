@@ -104,6 +104,9 @@ class AccessibilitySetupActivity : Activity() {
         content.addView(actionButton("Abrir autorização específica (destino directo)") {
             confirmAndOpenSpecificAuthorizationDirect()
         }, params(8))
+        content.addView(actionButton("Testar destino com serviço Android já instalado (sem activar)") {
+            confirmAndProbeSystemService()
+        }, params(8))
         content.addView(actionButton("Inventário técnico completo (Android + Acessibilidade)") {
             DeviceAccessibilityInventory.run(this)
         }, params(8))
@@ -247,6 +250,87 @@ class AccessibilitySetupActivity : Activity() {
         DiagnosticsFeature.record(
             this, "accessibility_tv_oem_direct_result",
             "opened=$opened;elapsed_realtime_ms=${SystemClock.elapsedRealtime()};$details"
+        )
+    }
+
+    /**
+     * Diagnostic only: launches the same OEM details screen for an already
+     * installed system accessibility service, without enabling or changing it.
+     * This distinguishes a broken OEM route from a DAdA-service-specific issue.
+     */
+    private fun confirmAndProbeSystemService() {
+        val manager = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+        val candidate = runCatching {
+            manager?.installedAccessibilityServiceList.orEmpty().firstOrNull { !matches(it) }
+        }.getOrNull()
+        if (candidate == null) {
+            DiagnosticsFeature.record(
+                this, "accessibility_system_service_probe_unavailable",
+                "no_other_installed_accessibility_service"
+            )
+            AlertDialog.Builder(this)
+                .setTitle("Teste indisponível")
+                .setMessage("Não foi encontrado outro serviço de Acessibilidade instalado para comparação.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+        val label = runCatching { candidate.resolveInfo.loadLabel(packageManager).toString() }
+            .getOrDefault("serviço Android")
+        val service = candidate.resolveInfo.serviceInfo
+        val componentName = ComponentName(service.packageName, service.name)
+        AlertDialog.Builder(this)
+            .setTitle("Teste do ecrã de autorização")
+            .setMessage(
+                "Vou abrir apenas a página de informação de «$label», um serviço que já vem instalado no Android. Este teste NÃO activa nem altera esse serviço. Observa se a página abre e regressa com o botão Voltar. Não escolhas opções para activar qualquer serviço."
+            )
+            .setNegativeButton("Cancelar", null)
+            .setPositiveButton("Abrir página") { _, _ ->
+                openSystemServiceAuthorization(candidate, componentName, label)
+            }
+            .show()
+    }
+
+    private fun openSystemServiceAuthorization(
+        serviceInfo: AccessibilityServiceInfo,
+        serviceComponent: ComponentName,
+        label: String
+    ) {
+        val resolved = runCatching {
+            packageManager.resolveActivity(
+                Intent(TV_ACCESSIBILITY_SERVICE_ACTION),
+                PackageManager.MATCH_DEFAULT_ONLY
+            )?.activityInfo?.let { ComponentName(it.packageName, it.name) }
+        }.getOrNull()
+        val details = "service=${serviceComponent.flattenToString()};label=$label;service_id=${runCatching { serviceInfo.id }.getOrNull()};destination=${describeActivity(resolved)}"
+        DiagnosticsFeature.record(this, "accessibility_system_service_probe_preflight", details)
+        if (resolved == null) {
+            lastLaunchRoute = "destino OEM indisponível para o serviço Android"
+            refreshStatus()
+            return
+        }
+        val intent = Intent(TV_ACCESSIBILITY_SERVICE_ACTION).apply {
+            component = resolved
+            putExtra(TV_ACCESSIBILITY_SERVICE_INFO_EXTRA, serviceInfo)
+        }
+        val opened = runCatching {
+            startActivity(intent)
+            true
+        }.getOrElse { error ->
+            DiagnosticsFeature.record(
+                this, "accessibility_system_service_probe_failed",
+                "error=${error.javaClass.simpleName}:${error.message.orEmpty().take(160)};$details"
+            )
+            false
+        }
+        lastLaunchRoute = if (opened) {
+            "teste do serviço Android enviado: $label"
+        } else {
+            "falha ao abrir o teste do serviço Android: $label"
+        }
+        DiagnosticsFeature.record(
+            this, "accessibility_system_service_probe_result",
+            "opened=$opened;$details"
         )
     }
 
