@@ -49,7 +49,7 @@ internal object StaticDexProbe {
                 when {
                     clazz.type.contains("TvSettingsService", true) -> 0
                     clazz.type.contains("IHgagentService", true) && (
-                        clazz.type.contains("$Stub", true) || clazz.type.contains("$Proxy", true)
+                        clazz.type.contains("\\$Stub", true) || clazz.type.contains("\\$Proxy", true)
                     ) -> 1
                     clazz.type.contains("IHgagentService", true) -> 2
                     clazz.type.contains("SettingsInterfaceImp", true) -> 3
