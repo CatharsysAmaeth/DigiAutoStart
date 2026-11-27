@@ -49,7 +49,7 @@ object DevicePackageMap {
                     if (!activity.isFinishing) {
                         AlertDialog.Builder(activity)
                             .setTitle("Falha no mapeamento")
-                            .setMessage("A análise foi interrompida. O erro ficou registado nos Diagnósticos (Debug).\\n\\n${error.javaClass.simpleName}: ${error.message ?: "sem detalhe"}")
+                            .setMessage("A análise foi interrompida. O erro ficou registado nos Diagnósticos (Debug).\n\n${error.javaClass.simpleName}: ${error.message ?: "sem detalhe"}")
                             .setPositiveButton("Fechar", null).show()
                     }
                 }
@@ -167,9 +167,9 @@ object DevicePackageMap {
 
         val output = StringBuilder()
         (metadata + listOf("=== DIGI APK STRING SAMPLE (FILTERED) ===") + scanLines).forEach { line ->
-            if (output.length + line.length + 1 <= 25000) output.append(line).append('\\n')
+            if (output.length + line.length + 1 <= 25000) output.append(line).append('\n')
         }
-        if (output.length >= 25000) output.append("[report capped after prioritised metadata and filtered DIGI strings]\\n")
+        if (output.length >= 25000) output.append("[report capped after prioritised metadata and filtered DIGI strings]\n")
         return output.toString()
     }
 
