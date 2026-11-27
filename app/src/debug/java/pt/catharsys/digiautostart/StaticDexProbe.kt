@@ -30,7 +30,7 @@ internal object StaticDexProbe {
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
             "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|onCreatePreferences|" +
-            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel|finish|isStartupVerificationRequired|onActivityResult|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
+            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
     fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File) {
@@ -62,10 +62,14 @@ internal object StaticDexProbe {
                             "onCreate" -> 0
                             "finish" -> 1
                             "getFlavor" -> 2
-                            "getAvailableFlavors" -> 3
-                            "createSettingsFragment" -> 4
+                            "createSettingsFragment" -> 3
+                            "getAvailableFlavors" -> 4
                             "getFeatureFactory" -> 5
-                            else -> 6
+                            "getSettingsFragmentProvider" -> 6
+                            "onCreatePreferences" -> 7
+                            "onPreferenceTreeClick" -> 8
+                            "onResume" -> 9
+                            else -> 10
                         }
                     }
                 for (method in methods) {
@@ -75,8 +79,12 @@ internal object StaticDexProbe {
                     val instructions = impl.instructions.toList()
                     output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
+                    val maxInstructions = if (method.name in setOf(
+                        "onCreate", "finish", "getFlavor", "getFeatureFactory",
+                        "createSettingsFragment", "getAvailableFlavors", "onCreatePreferences"
+                    )) 14 else 8
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= 18 || output.size >= 100) break
+                        if (emitted >= maxInstructions || output.size >= 100) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         val refText = when (ref) {
                             is StringReference -> " str=${ref.string.take(160)}"
