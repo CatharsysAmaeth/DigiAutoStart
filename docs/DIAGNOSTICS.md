@@ -7,7 +7,9 @@ Diagnostic collection is intended only for internal development and device testi
 - The normal Release contains no diagnostic upload implementation, diagnostic screen, accessibility observer or internal test-update tools.
 - The DIGI TV accessibility observer must be enabled manually by the user in Android Accessibility settings. It filters events to package `ro.digionline.tv`, records a bounded summary of visible UI nodes, and does not capture screenshots, audio or events from other apps.
 - Visible text from the DIGI TV interface can appear in the diagnostic log. Password-marked nodes are represented by a marker; email addresses and phone-like strings are redacted. The report must still be treated as potentially sensitive.
-- Reports are uploaded only after the user explicitly selects the report-upload action. The ZIP uses AES-256 encryption and is sent to the configured private diagnostics repository.
+- Reports are uploaded only after the user explicitly selects **Criar e enviar relatório**. The report is a normal, unencrypted ZIP sent over HTTPS to the configured private diagnostics repository. Anyone with read access to that private repository can read these reports; do not treat repository privacy as report-level encryption.
+- Before export, common credential patterns (GitHub tokens, bearer credentials, passwords, PIN/OTP/session/API-token fields), email addresses and phone-like strings are redacted. This is best-effort minimisation, not a guarantee that every sensitive value is detected; reports must still be treated as potentially sensitive.
+- The Debug APK contains the private-repository upload token so the app can upload directly without a separate sign-in step. A person who obtains the Debug APK can extract that token. Keep the Debug APK and token scope restricted to the private repository; never put this token in a Release APK, source file, commit or log.
 - Diagnostic reports must never be published in the public source repository.
 
 Do not commit diagnostic reports, credentials, signing material, internal service locations or personal/network information.
