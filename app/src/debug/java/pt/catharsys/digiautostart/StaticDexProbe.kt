@@ -91,8 +91,8 @@ internal object StaticDexProbe {
                     var emitted = 0
                     val maxDetails = when {
                         method.name == "onTransact" -> 64
-                        isProxy -> 18
-                        isService -> 28
+                        isProxy -> 36
+                        isService -> 56
                         else -> 12
                     }
                     for ((index, instruction) in instructions.withIndex()) {
