@@ -80,8 +80,8 @@ internal object StaticDexProbe {
                 if (output.size >= 420) break
                 val binderClass = clazz.type.contains("TvSettingsService", true) ||
                     clazz.type.contains("/aidl/", true) ||
-                    clazz.type.contains("$" + "Stub", true) ||
-                    clazz.type.contains("$" + "Proxy", true)
+                    clazz.type.contains("\$Stub", true) ||
+                    clazz.type.contains("\$Proxy", true)
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
                 if (binderClass) {
                     output += "dexBinderClass=${clazz.type};interfaces=${clazz.interfaces.joinToString(",")};accessFlags=${clazz.accessFlags}"
