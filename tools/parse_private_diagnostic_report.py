@@ -59,9 +59,9 @@ def scrub(value):
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
     patterns = [
         (re.compile(r"(?i)gh[pousr]_[A-Za-z0-9_]{20,}"), "[REDACTED_GITHUB_TOKEN]"),
-        (re.compile(r"(?i)Bearer\\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
-        (re.compile(r'(?i)("(?:password|passwd|pin|otp|token|authorization|cookie|session)"\\s*:\\s*")[^"]*(")'), r"\\1[REDACTED]\\2"),
-        (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
+        (re.compile(r"(?i)Bearer\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
+        (re.compile(r'(?i)("(?:password|passwd|pin|otp|token|authorization|cookie|session)"\s*:\s*")[^"]*(")'), r"\1[REDACTED]\2"),
+        (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
     ]
     for pattern, replacement in patterns:
         text = pattern.sub(replacement, text)
@@ -91,7 +91,7 @@ def run_hermes(bundle_path, report_stem):
         detail = (install.stderr or b"").decode("utf-8", errors="replace")[-2000:]
         put_private_file(
             f"reports/analysis/{report_stem}-hermes-status.txt",
-            ("hermes-dec 0.1.8 installation failed\\n" + detail).encode(),
+            ("hermes-dec 0.1.8 installation failed\n" + detail).encode(),
             f"analysis: Hermes installation status for {report_stem}",
         )
         return status
@@ -157,13 +157,6 @@ for archive_name in archive_names:
     archive_path = WORK / archive_name
     archive_path.write_bytes(archive_bytes)
     stem = pathlib.Path(archive_name).stem
-
-    patterns = [
-        (re.compile(r"(?i)gh[pousr]_[A-Za-z0-9_]{20,}"), "[REDACTED_GITHUB_TOKEN]"),
-        (re.compile(r"(?i)Bearer\\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
-        (re.compile(r'(?i)("(?:password|passwd|pin|otp|token|authorization|cookie|session)"\\s*:\\s*")[^"]*(")'), r"\\1[REDACTED]\\2"),
-        (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
-    ]
 
     with zipfile.ZipFile(archive_path) as zf:
         bad = zf.testzip()
