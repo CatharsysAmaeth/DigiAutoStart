@@ -129,7 +129,7 @@ object DevicePackageMap {
             }
         }
 
-        // Scan only DIGI's installed APKs. Capture URI literals separately from display strings.
+        // Scan DIGI APKs for filtered strings and URI literals.
         val digiInfo = runCatching {
             @Suppress("DEPRECATION")
             pm.getApplicationInfo(DIGI, 0)
@@ -139,6 +139,20 @@ object DevicePackageMap {
         } else {
             val apkPaths = (listOfNotNull(digiInfo.sourceDir) + digiInfo.splitSourceDirs.orEmpty()).distinct()
             for (path in apkPaths) scanApk(path, scanLines, discoveredUris)
+        }
+
+        // Separately inspect the ZTE/Android TV Settings DEX string pools.
+        // This is static, read-only string extraction, not decompilation or execution.
+        val settingsScanLines = mutableListOf<String>()
+        val tvSettingsInfo = runCatching {
+            @Suppress("DEPRECATION")
+            pm.getApplicationInfo("com.android.tv.settings", 0)
+        }.getOrNull()
+        if (tvSettingsInfo == null) {
+            settingsScanLines += "TvSettings package unavailable for DEX scan."
+        } else {
+            val settingsApks = (listOfNotNull(tvSettingsInfo.sourceDir) + tvSettingsInfo.splitSourceDirs.orEmpty()).distinct()
+            for (path in settingsApks) scanSettingsDex(path, settingsScanLines)
         }
 
         // Resolve scheme and exact URI candidates using PackageManager only; never launch them.
@@ -166,11 +180,93 @@ object DevicePackageMap {
         }
 
         val output = StringBuilder()
-        (metadata + listOf("=== DIGI APK STRING SAMPLE (FILTERED) ===") + scanLines).forEach { line ->
+        (metadata +
+            listOf("=== DIGI APK STRING SAMPLE (FILTERED) ===") + scanLines +
+            listOf("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===") + settingsScanLines
+        ).forEach { line ->
             if (output.length + line.length + 1 <= 25000) output.append(line).append('\n')
         }
-        if (output.length >= 25000) output.append("[report capped after prioritised metadata and filtered DIGI strings]\n")
+        if (output.length >= 25000) output.append("[report capped after prioritised package metadata and targeted strings]\n")
         return output.toString()
+    }
+
+    /**
+     * Extracts only bounded, relevant strings from classes*.dex in TvSettings.
+     * DEX string_ids point to string_data_item records; no class is loaded or executed.
+     */
+    private fun scanSettingsDex(path: String, output: MutableList<String>) {
+        try {
+            ZipFile(File(path)).use { zip ->
+                val entries = zip.entries().asSequence()
+                    .filter { !it.isDirectory && it.name.matches(Regex("classes[0-9]*\\.dex")) }
+                    .take(8).toList()
+                output += "settingsDexApk=${File(path).name};dexEntries=${entries.size}"
+                val matches = linkedSetOf<String>()
+                var totalBytes = 0
+                for (entry in entries) {
+                    if (totalBytes >= 12 * 1024 * 1024 || matches.size >= 120) break
+                    if (entry.size <= 0L || entry.size > 8L * 1024 * 1024) {
+                        output += "settingsDexSkipped=${entry.name};size=${entry.size}"
+                        continue
+                    }
+                    val bytes = zip.getInputStream(entry).use { it.readBytes() }
+                    totalBytes += bytes.size
+                    val strings = readDexStringPool(bytes)
+                    val target = Regex(
+                        "(?i)(A11yServiceOemLink|accessibilityServiceInfo|X_EXPERIENCE|FlavorUtils|" +
+                            "FeatureFactory|SettingsFragmentProvider|AccessibilityServiceFragment|" +
+                            "AccessibilityServiceActivity|AccessibilitySettingsActivity|" +
+                            "Activity is not supported in current flavor|accessibility.*(service|fragment|flavor)|" +
+                            "ZteKeyInterceptor|TvSettingsService)"
+                    )
+                    strings.filter { target.containsMatchIn(it) }.forEach { value ->
+                        if (matches.size < 120 && value.length <= 500) matches += "${entry.name}:${value}"
+                    }
+                }
+                output += "settingsDexBytesScanned=$totalBytes;targetedStrings=${matches.size}"
+                matches.forEach { output += "settingsDexString=$it" }
+            }
+        } catch (e: Exception) {
+            output += "settingsDexScanError=${File(path).name};${e.javaClass.simpleName}:${e.message}"
+        }
+    }
+
+    private fun readDexStringPool(bytes: ByteArray): List<String> {
+        if (bytes.size < 0x70 || !bytes.copyOfRange(0, 3).contentEquals(byteArrayOf(0x64, 0x65, 0x78))) return emptyList()
+        fun u32(offset: Int): Int {
+            if (offset < 0 || offset + 4 > bytes.size) return -1
+            return (bytes[offset].toInt() and 0xff) or
+                ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+                ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+                ((bytes[offset + 3].toInt() and 0xff) shl 24)
+        }
+        fun readUleb(start: Int): Pair<Int, Int>? {
+            var value = 0
+            var shift = 0
+            var cursor = start
+            while (cursor < bytes.size && shift <= 28) {
+                val b = bytes[cursor++].toInt() and 0xff
+                value = value or ((b and 0x7f) shl shift)
+                if ((b and 0x80) == 0) return value to cursor
+                shift += 7
+            }
+            return null
+        }
+        val count = u32(0x38)
+        val idsOffset = u32(0x3c)
+        if (count !in 1..500_000 || idsOffset < 0 || idsOffset.toLong() + count.toLong() * 4 > bytes.size) return emptyList()
+        val result = ArrayList<String>(minOf(count, 100_000))
+        for (index in 0 until count) {
+            val dataOffset = u32(idsOffset + index * 4)
+            if (dataOffset < 0 || dataOffset >= bytes.size) continue
+            val header = readUleb(dataOffset) ?: continue
+            var end = header.second
+            while (end < bytes.size && bytes[end].toInt() != 0) end++
+            if (end >= bytes.size || end == header.second) continue
+            val value = String(bytes, header.second, end - header.second, Charsets.UTF_8)
+            if (value.isNotBlank()) result += value
+        }
+        return result
     }
 
     private fun scanApk(path: String, output: MutableList<String>, discoveredUris: MutableSet<String>) {
