@@ -97,7 +97,7 @@ def run_jadx(dex_files, report_stem):
     jadx = str(executables[0])
     selected = {"digi": [], "zte-tv-settings": []}
     patterns = {
-        "digi": re.compile(r"(?i)(MainActivity|MainApplication|ReactActivity|sendIntentAndroid|Linking|channel|livestream|player|Intent\\.ACTION_VIEW)"),
+        "digi": re.compile(r"(?i)(MainActivity|MainApplication|ReactActivity|sendIntentAndroid|Linking|channel|livestream|player|Intent\.ACTION_VIEW)"),
         "zte-tv-settings": re.compile(r"(?i)(AccessibilityServiceActivity|AccessibilitySettingsActivity|AccessibilityServiceFragment|AccessibilitySettingsFragment|FlavorUtils|X_EXPERIENCE_FLAVORS_MASK|FeatureFactory|SettingsFragmentProvider|ACCESSIBILITY_SETTINGS|A11yServiceOemLink|TvSettingsActivity)"),
     }
     for group, dex_path in dex_files:
@@ -125,12 +125,12 @@ def run_jadx(dex_files, report_stem):
             if not patterns[group].search(str(source_path)) and not patterns[group].search(source):
                 continue
             relative = source_path.relative_to(out_dir).as_posix()
-            selected[group].append(f"===== {relative} =====\\n{source}\\n")
+            selected[group].append(f"===== {relative} =====\n{source}\n")
     for group, sources in selected.items():
         if not sources:
             status.append(f"jadx_{group}_selected=0")
             continue
-        data = ("\\n".join(sources)).encode("utf-8")
+        data = ("\n".join(sources)).encode("utf-8")
         for part, offset in enumerate(range(0, len(data), MAX_ANALYSIS_FILE), start=1):
             chunk = data[offset:offset + MAX_ANALYSIS_FILE]
             suffix = f"-part{part:02d}" if len(data) > MAX_ANALYSIS_FILE else ""
