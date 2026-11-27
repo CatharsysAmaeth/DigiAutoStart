@@ -50,6 +50,10 @@ object DevicePackageMap {
                 continue
             }
             val app = info.applicationInfo
+            if (app == null) {
+                add("application_info=null")
+                continue
+            }
             add("version=${info.versionName};versionCode=${if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode}")
             add("app_enabled=${app.enabled};system_app=${(app.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0}")
             add("sourceDir=${app.sourceDir};publicSourceDir=${app.publicSourceDir}")
