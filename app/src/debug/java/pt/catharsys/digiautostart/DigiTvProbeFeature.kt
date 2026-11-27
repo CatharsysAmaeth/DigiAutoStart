@@ -22,6 +22,7 @@ object DigiTvProbeFeature {
 
     fun show(activity: Activity) {
         val options = arrayOf(
+            "Mapear APK DIGI TV e Definições ZTE (leitura)",
             "Inspecionar aplicação e deep links (sem abrir)",
             "Testar deep link candidato para o canal 1",
             "Abrir DIGI TV normalmente",
@@ -32,11 +33,12 @@ object DigiTvProbeFeature {
             .setTitle("Investigação DIGI TV")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> inspect(activity)
-                    1 -> launchCandidate(activity)
-                    2 -> launchNormally(activity)
-                    3 -> explainAccessibilityProbe(activity)
-                    4 -> DiagnosticsFeature.show(activity)
+                    0 -> DevicePackageMap.run(activity)
+                    1 -> inspect(activity)
+                    2 -> launchCandidate(activity)
+                    3 -> launchNormally(activity)
+                    4 -> explainAccessibilityProbe(activity)
+                    5 -> DiagnosticsFeature.show(activity)
                 }
             }
             .setNegativeButton("Fechar", null)
