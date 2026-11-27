@@ -67,6 +67,81 @@ def scrub(value):
         text = pattern.sub(replacement, text)
     return text
 
+def run_jadx(dex_files, report_stem):
+    if not dex_files:
+        return []
+    status = []
+    release_zip = WORK / "jadx-1.5.7.zip"
+    download = subprocess.run(
+        ["curl", "-L", "--fail", "--silent", "--show-error",
+         "https://github.com/skylot/jadx/releases/download/v1.5.7/jadx-1.5.7.zip",
+         "-o", str(release_zip)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=180,
+    )
+    if download.returncode != 0:
+        put_private_file(
+            f"reports/analysis/{report_stem}-jadx-status.txt",
+            b"jadx 1.5.7 download failed",
+            f"analysis: JADX status for {report_stem}",
+        )
+        return ["jadx_download=failed"]
+    jadx_root = WORK / "jadx-1.5.7"
+    jadx_root.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(release_zip) as zf:
+        zf.extractall(jadx_root)
+    executables = list(jadx_root.glob("**/bin/jadx"))
+    if not executables:
+        return ["jadx_executable=not_found"]
+    jadx = str(executables[0])
+    selected = {"digi": [], "zte-tv-settings": []}
+    patterns = {
+        "digi": re.compile(r"(?i)(MainActivity|MainApplication|ReactActivity|sendIntentAndroid|Linking|channel|livestream|player|Intent\\.ACTION_VIEW)"),
+        "zte-tv-settings": re.compile(r"(?i)(AccessibilityServiceActivity|AccessibilitySettingsActivity|AccessibilityServiceFragment|AccessibilitySettingsFragment|FlavorUtils|X_EXPERIENCE_FLAVORS_MASK|FeatureFactory|SettingsFragmentProvider|ACCESSIBILITY_SETTINGS|A11yServiceOemLink|TvSettingsActivity)"),
+    }
+    for group, dex_path in dex_files:
+        out_dir = WORK / f"{report_stem}-jadx-{group}-{pathlib.Path(dex_path).stem}"
+        result = subprocess.run(
+            [jadx, "--no-res", "-d", str(out_dir), str(dex_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=360,
+        )
+        status.append(f"jadx_{group}=exit_{result.returncode}")
+        if result.returncode != 0:
+            detail = (result.stderr or b"").decode("utf-8", errors="replace")[-3000:]
+            put_private_file(
+                f"reports/analysis/{report_stem}-jadx-{group}-stderr.txt",
+                detail.encode(),
+                f"analysis: JADX diagnostics for {report_stem} {group}",
+            )
+            continue
+        for source_path in sorted(out_dir.rglob("*.java")):
+            try:
+                source = source_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if not patterns[group].search(str(source_path)) and not patterns[group].search(source):
+                continue
+            relative = source_path.relative_to(out_dir).as_posix()
+            selected[group].append(f"===== {relative} =====\\n{source}\\n")
+    for group, sources in selected.items():
+        if not sources:
+            status.append(f"jadx_{group}_selected=0")
+            continue
+        data = ("\\n".join(sources)).encode("utf-8")
+        for part, offset in enumerate(range(0, len(data), MAX_ANALYSIS_FILE), start=1):
+            chunk = data[offset:offset + MAX_ANALYSIS_FILE]
+            suffix = f"-part{part:02d}" if len(data) > MAX_ANALYSIS_FILE else ""
+            put_private_file(
+                f"reports/analysis/{report_stem}-jadx-{group}{suffix}.txt",
+                chunk,
+                f"analysis: JADX selected {group} classes for {report_stem}",
+            )
+        status.append(f"jadx_{group}_selected={len(sources)};bytes={len(data)}")
+    return status
+
 def run_hermes(bundle_path, report_stem):
     status = []
     output_dir = WORK / (report_stem + "-hermes")
@@ -174,6 +249,7 @@ for archive_name in archive_names:
 
         evidence_records = []
         bundle_local = None
+        dex_local_files = []
         evidence_total = 0
         evidence_members = sorted(name for name in names if name.startswith("evidence/") and not name.endswith("/"))
         for member in evidence_members:
@@ -195,6 +271,12 @@ for archive_name in archive_names:
             if relative.name == "index.android.bundle":
                 bundle_local = WORK / (stem + "-index.android.bundle")
                 bundle_local.write_bytes(data)
+            if relative.suffix.lower() == ".dex":
+                dex_local = WORK / (stem + "-" + relative.parent.name + "-" + relative.name)
+                dex_local.write_bytes(data)
+                group = relative.parts[0] if relative.parts else ""
+                if group in ("digi", "zte-tv-settings"):
+                    dex_local_files.append((group, dex_local))
 
     events = []
     for line in payload.get("events.jsonl", "").splitlines():
@@ -208,6 +290,7 @@ for archive_name in archive_names:
     hermes_status = []
     if bundle_local and bundle_local.exists():
         hermes_status = run_hermes(bundle_local, stem)
+    jadx_status = run_jadx(dex_local_files, stem)
 
     out = WORK / (stem + ".md")
     parts = [
@@ -226,10 +309,13 @@ for archive_name in archive_names:
         "## Hermes analysis status", "",
         *([f"- {item}" for item in hermes_status] if hermes_status else ["- No Hermes bundle found in this report."]),
         "",
+        "## JADX analysis status", "",
+        *([f"- {item}" for item in jadx_status] if jadx_status else ["- No DEX files found in this report."]),
+        "",
         "## Events (JSON)", "", "~~~json", scrub(events), "~~~", "",
     ]
     out.write_text("\n".join(parts), encoding="utf-8")
-    print(f"Validated {archive_name}: {len(events)} events; {len(evidence_records)} raw evidence files preserved privately; Hermes statuses={','.join(hermes_status) or 'none'}.")
+    print(f"Validated {archive_name}: {len(events)} events; {len(evidence_records)} raw evidence files preserved privately; Hermes={','.join(hermes_status) or 'none'}; JADX={','.join(jadx_status) or 'none'}.")
 
     put_private_file(
         f"reports/parsed/{out.name}",
