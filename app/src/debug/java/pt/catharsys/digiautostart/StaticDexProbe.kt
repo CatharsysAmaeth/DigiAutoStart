@@ -106,9 +106,9 @@ internal object StaticDexProbe {
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         if (ref is FieldReference && settingsResources != null) {
                             val resourceType = when {
-                                ref.definingClass.endsWith("R\\$integer;") -> "integer"
-                                ref.definingClass.endsWith("R\\$string;") -> "string"
-                                ref.definingClass.endsWith("R\\$bool;") -> "bool"
+                                ref.definingClass.endsWith("R\$integer;") -> "integer"
+                                ref.definingClass.endsWith("R\$string;") -> "string"
+                                ref.definingClass.endsWith("R\$bool;") -> "bool"
                                 else -> null
                             }
                             if (resourceType != null) {
