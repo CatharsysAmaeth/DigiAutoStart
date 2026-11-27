@@ -16,8 +16,8 @@ android {
         applicationId = "pt.catharsys.digiautostart"
         minSdk = 28
         targetSdk = 35
-        versionCode = 30
-        versionName = "0.6.19"
+        versionCode = 31
+        versionName = "0.6.20"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
