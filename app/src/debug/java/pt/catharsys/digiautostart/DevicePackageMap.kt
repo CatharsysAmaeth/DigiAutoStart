@@ -294,16 +294,28 @@ object DevicePackageMap {
     private fun scanApk(path: String, output: MutableList<String>, discoveredUris: MutableSet<String>) {
         try {
             ZipFile(File(path)).use { zip ->
-                val entries = zip.entries().asSequence().filter { entry ->
+                val allEntries = zip.entries().asSequence().filter { entry ->
                     !entry.isDirectory && (
                         entry.name.matches(Regex("classes[0-9]*\\.dex")) ||
                             entry.name.startsWith("assets/") &&
                             (entry.name.contains("bundle", true) || entry.name.endsWith(".js") ||
                                 entry.name.endsWith(".json") || entry.name.endsWith(".map"))
                         )
-                }.take(18).toList()
-                output += "apkScan=${File(path).name};selectedEntries=${entries.size}"
+                }.toList()
+                val inventory = allEntries.filter { it.name.startsWith("assets/") }
+                    .take(32).joinToString("|") { "${it.name}:${it.size}" }
+                output += "apkScan=${File(path).name};candidateEntries=${allEntries.size};assetInventory=$inventory"
+                val entries = allEntries.sortedBy { entry ->
+                    when {
+                        entry.name.endsWith(".map", true) -> 0
+                        entry.name.contains("bundle", true) -> 1
+                        entry.name.startsWith("assets/") -> 2
+                        else -> 3
+                    }
+                }.take(18)
+                output += "selectedEntries=${entries.size}"
                 val found = linkedSetOf<String>()
+                val sourceMapMatches = linkedSetOf<String>()
                 var totalBytesRead = 0
                 val maxTotalBytes = 10 * 1024 * 1024
                 for (entry in entries) {
@@ -327,6 +339,34 @@ object DevicePackageMap {
                         buffer.toByteArray()
                     }
                     totalBytesRead += bytes.size
+                    if (entry.name.contains("bundle", true)) {
+                        val header = bytes.take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                        output += "bundleHeader=${entry.name};hex=$header"
+                    }
+                    if (entry.name.endsWith(".map", true)) {
+                        val map = runCatching {
+                            org.json.JSONObject(bytes.toString(Charsets.UTF_8))
+                        }.getOrNull()
+                        val sources = map?.optJSONArray("sources")
+                        val contents = map?.optJSONArray("sourcesContent")
+                        if (sources != null && contents != null) {
+                            val terms = Regex("(?i)(ia-livestream|common_id|/api/vod/play/api/channel|stream/|navigate|linking|deep.?link|channel.?id|epg)")
+                            for (index in 0 until minOf(sources.length(), contents.length())) {
+                                val source = contents.optString(index, "")
+                                if (source.isBlank()) continue
+                                for (match in terms.findAll(source).take(24)) {
+                                    val start = maxOf(0, match.range.first - 140)
+                                    val end = minOf(source.length, match.range.last + 180)
+                                    val snippet = source.substring(start, end).replace(Regex("\\s+"), " ")
+                                    sourceMapMatches += "${sources.optString(index)}:${snippet.take(420)}"
+                                    if (sourceMapMatches.size >= 35) break
+                                }
+                                if (sourceMapMatches.size >= 35) break
+                            }
+                        } else {
+                            output += "sourceMap=${entry.name};sources=${sources?.length() ?: 0};embeddedContents=false"
+                        }
+                    }
                     val raw = bytes.toString(Charsets.ISO_8859_1)
                     uriPattern.findAll(raw).forEach { match ->
                         val uri = match.value.trimEnd('.', ',', ';', ')', ']', '}')
@@ -340,8 +380,9 @@ object DevicePackageMap {
                         }
                     }
                 }
-                output += "apkBytesScanned=$totalBytesRead;relevantStrings=${found.size};uriLiterals=${discoveredUris.size}"
+                output += "apkBytesScanned=$totalBytesRead;relevantStrings=${found.size};uriLiterals=${discoveredUris.size};sourceMapMatches=${sourceMapMatches.size}"
                 found.forEach { output += "apkString=$it" }
+                sourceMapMatches.forEach { output += "sourceMapMatch=$it" }
             }
         } catch (e: Exception) {
             output += "apkScanError=${File(path).name};${e.javaClass.simpleName}:${e.message}"
