@@ -248,44 +248,6 @@ jobs:
             exit 1
           fi
 
-          # Backfill the last pre-archive Debug build from immutable Git history.
-          LEGACY_REF="ae524fed4fe71f272354215a7756abcb649eafab"
-          LEGACY_VERSION_JSON="$(gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/version.json?ref=$LEGACY_REF")"
-          LEGACY_VERSION_NAME="$(jq -r '.versionName' <<< "$LEGACY_VERSION_JSON")"
-          LEGACY_VERSION_CODE="$(jq -r '.versionCode' <<< "$LEGACY_VERSION_JSON")"
-          LEGACY_EXPECTED_SHA="$(jq -r '.sha256' <<< "$LEGACY_VERSION_JSON")"
-          if [ "$LEGACY_VERSION_NAME" = "0.6.15" ] && [ "$LEGACY_VERSION_CODE" = "26" ]; then
-            LEGACY_ARCHIVE_APK="apk/archive/DigiAutoStart-debug-$LEGACY_VERSION_NAME-$LEGACY_VERSION_CODE-recovered.apk"
-            if ! gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$LEGACY_ARCHIVE_APK?ref=main" >/dev/null 2>&1; then
-              gh api "repos/$PRIVATE_ASSETS_REPOSITORY/contents/apk/DigiAutoStart-debug.apk?ref=$LEGACY_REF" --jq '.content' |
-                tr -d '\n' | base64 -d > /tmp/legacy-dada-debug.apk
-              LEGACY_ACTUAL_SHA="$(sha256sum /tmp/legacy-dada-debug.apk | awk '{print $1}')"
-              if [ "$LEGACY_ACTUAL_SHA" != "$LEGACY_EXPECTED_SHA" ]; then
-                echo "::error::Historical Debug APK SHA-256 does not match its version metadata."
-                exit 1
-              fi
-              base64 -w 0 /tmp/legacy-dada-debug.apk > /tmp/legacy-dada-debug.base64
-              jq --rawfile content /tmp/legacy-dada-debug.base64 -n \
-                --arg message "archive: recover Debug 0.6.15 (26) from Git history" \
-                --arg branch "main" \
-                '{message:$message,content:$content,branch:$branch}' |
-                gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$LEGACY_ARCHIVE_APK" --input - >/dev/null
-              jq -n \
-                --arg versionName "$LEGACY_VERSION_NAME" \
-                --arg versionCode "$LEGACY_VERSION_CODE" \
-                --arg sha256 "$LEGACY_EXPECTED_SHA" \
-                --arg recoveredFrom "$LEGACY_REF" \
-                --arg apk "$LEGACY_ARCHIVE_APK" \
-                '{versionName:$versionName,versionCode:($versionCode|tonumber),sha256:$sha256,recoveredFromCommit:$recoveredFrom,apk:$apk}' > /tmp/legacy-dada-debug.json
-              base64 -w 0 /tmp/legacy-dada-debug.json > /tmp/legacy-dada-debug-json.base64
-              jq --rawfile content /tmp/legacy-dada-debug-json.base64 -n \
-                --arg message "archive metadata: recovered Debug 0.6.15 (26)" \
-                --arg branch "main" \
-                '{message:$message,content:$content,branch:$branch}' |
-                gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$LEGACY_ARCHIVE_APK.json" --input - >/dev/null
-            fi
-          fi
-
           APK_DEBUG="app/build/outputs/apk/android12/debug/app-android12-debug.apk"
           FILE="apk/DigiAutoStart-debug.apk"
           base64 -w 0 "$APK_DEBUG" > /tmp/debug-apk.base64
