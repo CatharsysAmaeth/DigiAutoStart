@@ -168,7 +168,14 @@ internal object StaticDexProbe {
                             }
                         }
                         val operands = buildString {
-                            if (instruction is NarrowLiteralInstruction) append(" literal=${instruction.narrowLiteral}")
+                            if (instruction is NarrowLiteralInstruction) {
+                                val literal = instruction.narrowLiteral
+                                if (literal > 99_999_999 || literal < -99_999_999) {
+                                    append(" literalHex=0x" + java.lang.Integer.toHexString(literal))
+                                } else {
+                                    append(" literal=$literal")
+                                }
+                            }
                             if (instruction is WideLiteralInstruction) append(" literal=${instruction.wideLiteral}")
                             if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
                         }
