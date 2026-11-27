@@ -10,6 +10,8 @@ import org.jf.dexlib2.iface.reference.FieldReference
 import org.jf.dexlib2.iface.reference.MethodReference
 import org.jf.dexlib2.iface.reference.StringReference
 import org.jf.dexlib2.iface.reference.TypeReference
+import org.jf.dexlib2.iface.value.IntEncodedValue
+import android.content.Context
 import java.io.File
 
 /** Debug-only, read-only disassembly of selected TvSettings methods. */
@@ -33,7 +35,7 @@ internal object StaticDexProbe {
             "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
-    fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File) {
+    fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File, context: Context) {
         val temp = File.createTempFile("dada-tvsettings-", ".dex", cacheDir)
         try {
             temp.writeBytes(bytes)
@@ -53,9 +55,25 @@ internal object StaticDexProbe {
                 }
             }
             output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
+            val settingsResources = runCatching {
+                context.packageManager.getResourcesForApplication("com.android.tv.settings")
+            }.getOrNull()
+            val queriedResources = linkedSetOf<String>()
             for (clazz in selected) {
                 if (output.size >= 100) break
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
+                if (clazz.type.contains("FlavorUtils")) {
+                    clazz.fields.filter { it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) }
+                        .forEach { field ->
+                            val encoded = field.initialValue
+                            val value = when (encoded) {
+                                is IntEncodedValue -> encoded.value.toString()
+                                null -> "unset"
+                                else -> encoded.toString()
+                            }
+                            output += "dexStaticField=${field.name}:${field.type}=$value"
+                        }
+                }
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
                     .sortedBy { method ->
                         when (method.name) {
@@ -86,6 +104,32 @@ internal object StaticDexProbe {
                     for ((index, instruction) in instructions.withIndex()) {
                         if (emitted >= maxInstructions || output.size >= 100) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
+                        if (ref is FieldReference && settingsResources != null) {
+                            val resourceType = when {
+                                ref.definingClass.endsWith("R\\$integer;") -> "integer"
+                                ref.definingClass.endsWith("R\\$string;") -> "string"
+                                ref.definingClass.endsWith("R\\$bool;") -> "bool"
+                                else -> null
+                            }
+                            if (resourceType != null) {
+                                val key = "$resourceType/" + ref.name
+                                if (queriedResources.add(key)) {
+                                    val id = settingsResources.getIdentifier(ref.name, resourceType, "com.android.tv.settings")
+                                    if (id != 0) {
+                                        val value = runCatching {
+                                            when (resourceType) {
+                                                "integer" -> settingsResources.getInteger(id).toString()
+                                                "string" -> settingsResources.getString(id).take(180)
+                                                else -> settingsResources.getBoolean(id).toString()
+                                            }
+                                        }.getOrElse { "read-error:${it.javaClass.simpleName}" }
+                                        output += "tvSettingsResource=$key;id=$id;value=$value"
+                                    } else {
+                                        output += "tvSettingsResource=$key;not-found"
+                                    }
+                                }
+                            }
+                        }
                         val refText = when (ref) {
                             is StringReference -> " str=${ref.string.take(160)}"
                             is MethodReference -> " method=${ref.definingClass}->${ref.name}(" +
