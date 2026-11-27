@@ -233,6 +233,7 @@ object DevicePackageMap {
                     val bytes = zip.getInputStream(entry).use { it.readBytes() }
                     totalBytes += bytes.size
                     val strings = readDexStringPool(bytes)
+                    StaticDexProbe.inspect(bytes, entry.name, output)
                     val target = Regex(
                         "(?i)(A11yServiceOemLink|accessibilityServiceInfo|X_EXPERIENCE|FlavorUtils|" +
                             "FeatureFactory|SettingsFragmentProvider|AccessibilityServiceFragment|" +
