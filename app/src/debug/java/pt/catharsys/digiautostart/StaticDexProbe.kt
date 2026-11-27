@@ -22,7 +22,10 @@ internal object StaticDexProbe {
         "/TvSettingsActivity;",
         "/overlay/FlavorUtils;",
         "/library/overlay/FlavorUtils;",
-        "/overlay/FeatureFactory",
+        "/overlay/FeatureFactoryImpl;",
+        "/overlay/FeatureFactoryImplX;",
+        "/overlay/FeatureFactoryImplTwoPanel;",
+        "/accessibility/AccessibilityFragment;",
         "/SettingsFragmentProvider;",
         "/accessibility/AccessibilityServiceFragment;",
         "/accessibility/AccessibilityServiceConfirmationFragment;",
@@ -31,7 +34,7 @@ internal object StaticDexProbe {
     )
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
-            "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|onCreatePreferences|" +
+            "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|isTwoPanel|onCreatePreferences|" +
             "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
@@ -48,9 +51,11 @@ internal object StaticDexProbe {
                     clazz.type.contains("FlavorUtils") -> 1
                     clazz.type.contains("oemlink/AccessibilityServiceActivity") -> 2
                     clazz.type.contains("oemlink/AccessibilitySettingsActivity") -> 3
-                    clazz.type.contains("FeatureFactory") -> 4
-                    clazz.type.contains("AccessibilityServiceFragment") -> 5
-                    clazz.type.contains("ZteKeyInterceptor") -> 6
+                    clazz.type.contains("FeatureFactoryImplX") -> 4
+                    clazz.type.contains("FeatureFactoryImplTwoPanel") -> 5
+                    clazz.type.contains("FeatureFactoryImpl") -> 6
+                    clazz.type.contains("AccessibilityServiceFragment") -> 7
+                    clazz.type.contains("ZteKeyInterceptor") -> 8
                     else -> 7
                 }
             }
@@ -60,7 +65,7 @@ internal object StaticDexProbe {
             }.getOrNull()
             val queriedResources = linkedSetOf<String>()
             for (clazz in selected) {
-                if (output.size >= 100) break
+                if (output.size >= 180) break
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
                 if (clazz.type.contains("FlavorUtils")) {
                     clazz.fields.filter { it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) }
@@ -91,18 +96,24 @@ internal object StaticDexProbe {
                         }
                     }
                 for (method in methods) {
-                    if (output.size >= 100) break
+                    if (output.size >= 180) break
                     val impl = method.implementation ?: continue
                     val signature = method.parameterTypes.joinToString("") { it.toString() }
                     val instructions = impl.instructions.toList()
                     output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
-                    val maxInstructions = if (method.name in setOf(
-                        "onCreate", "finish", "getFlavor", "getFeatureFactory",
-                        "createSettingsFragment", "getAvailableFlavors", "onCreatePreferences"
-                    )) 14 else 8
+                    val fullFlavorMethod = clazz.type.contains("FlavorUtils") && method.name == "getFlavor"
+                    val maxInstructions = when {
+                        fullFlavorMethod -> 220
+                        clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory" -> 100
+                        method.name in setOf(
+                            "onCreate", "finish", "createSettingsFragment",
+                            "getAvailableFlavors", "onCreatePreferences", "isTwoPanel"
+                        ) -> 24
+                        else -> 10
+                    }
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= maxInstructions || output.size >= 100) break
+                        if (emitted >= maxInstructions || output.size >= 180) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         if (ref is FieldReference && settingsResources != null) {
                             val resourceType = when {
@@ -140,12 +151,29 @@ internal object StaticDexProbe {
                         }
                         val lower = refText.lowercase()
                         val opcode = instruction.opcode.name.lowercase()
+                        if (fullFlavorMethod && instruction is NarrowLiteralInstruction && settingsResources != null) {
+                            val resourceId = instruction.narrowLiteral
+                            val resourceName = runCatching { settingsResources.getResourceName(resourceId) }.getOrNull()
+                            if (resourceName != null) {
+                                val resourceType = runCatching { settingsResources.getResourceTypeName(resourceId) }.getOrNull()
+                                val resourceValue = runCatching {
+                                    when (resourceType) {
+                                        "string" -> settingsResources.getString(resourceId).take(240)
+                                        "integer" -> settingsResources.getInteger(resourceId).toString()
+                                        "bool" -> settingsResources.getBoolean(resourceId).toString()
+                                        else -> "(type=$resourceType)"
+                                    }
+                                }.getOrElse { "read-error:" + it.javaClass.simpleName }
+                                output += "tvSettingsLiteralResource=id=0x" + java.lang.Integer.toHexString(resourceId) + ";name=$resourceName;value=$resourceValue"
+                            }
+                        }
                         val operands = buildString {
                             if (instruction is NarrowLiteralInstruction) append(" literal=${instruction.narrowLiteral}")
                             if (instruction is WideLiteralInstruction) append(" literal=${instruction.wideLiteral}")
                             if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
                         }
-                        val relevant = ref is MethodReference || ref is FieldReference ||
+                        val relevant = fullFlavorMethod || (clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory") ||
+                            ref is MethodReference || ref is FieldReference ||
                             (ref is StringReference && (
                                 lower.contains("accessibility") || lower.contains("flavor") ||
                                     lower.contains("unsupported") || lower.contains("service")
