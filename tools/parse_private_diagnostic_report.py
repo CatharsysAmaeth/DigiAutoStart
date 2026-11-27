@@ -33,7 +33,7 @@ archive_name = candidates[-1]
 encoded = json.loads(gh_api(
     f"repos/{PRIVATE_REPO}/contents/reports/{archive_name}?ref=main"
 ))["content"]
-archive_bytes = base64.b64decode(encoded, validate=True)
+encoded = "".join(encoded.split())  # GitHub Contents API wraps base64 with whitespace.\narchive_bytes = base64.b64decode(encoded, validate=True)
 if len(archive_bytes) > MAX_ARCHIVE:
     raise SystemExit("Report archive exceeds the 12 MiB safety limit.")
 archive_path = WORK / archive_name
