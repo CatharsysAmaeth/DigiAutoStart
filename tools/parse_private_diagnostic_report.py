@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and parse the newest unencrypted DAdA diagnostic ZIP from the private repository."""
+"""Fetch, validate, redact and privately store the newest unencrypted DAdA diagnostic ZIP."""
 import base64
 import json
 import os
@@ -10,8 +10,7 @@ import zipfile
 
 PRIVATE_REPO = os.environ["DADA_PRIVATE_REPOSITORY"]
 TOKEN = os.environ["DADA_PRIVATE_TOKEN"]
-ROOT = pathlib.Path(os.environ.get("RUNNER_TEMP", "/tmp"))
-WORK = ROOT / "dada-reports"
+WORK = pathlib.Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "dada-reports"
 WORK.mkdir(parents=True, exist_ok=True)
 MAX_ARCHIVE = 12 * 1024 * 1024
 MAX_MEMBER = 12 * 1024 * 1024
@@ -57,9 +56,8 @@ with zipfile.ZipFile(archive_path) as zf:
 patterns = [
     (re.compile(r"(?i)gh[pousr]_[A-Za-z0-9_]{20,}"), "[REDACTED_GITHUB_TOKEN]"),
     (re.compile(r"(?i)Bearer\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
-    (re.compile(r'(?i)("?\s*(?:password|passwd|pin|otp|token|authorization|cookie|session)"?\s*[:=]\s*")[^"]*(")'), r"\1[REDACTED]\2"),
+    (re.compile(r'(?i)("(?:password|passwd|pin|otp|token|authorization|cookie|session)"\s*:\s*")[^"]*(")'), r"\1[REDACTED]\2"),
     (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
-    (re.compile(r"(?<!\d)(?:\+?\d[\s().-]*){9,14}(?!\d)"), "[REDACTED_PHONE]"),
 ]
 
 def scrub(value):
@@ -90,7 +88,7 @@ parts = [
     "## Events (JSON)", "", "~~~json", scrub(events), "~~~", "",
 ]
 out.write_text("\n".join(parts), encoding="utf-8")
-print(f"Parsed {archive_name}: {len(events)} events; extracted report prepared for private upload.")
+print(f"Validated and parsed {archive_name}: {len(events)} events.")
 
 content_b64 = base64.b64encode(out.read_bytes()).decode("ascii")
 body = json.dumps({
