@@ -11,8 +11,8 @@ import zipfile
 PRIVATE_REPO = os.environ["DADA_PRIVATE_REPOSITORY"]
 TOKEN = os.environ["DADA_PRIVATE_TOKEN"]
 ROOT = pathlib.Path(os.environ.get("RUNNER_TEMP", "/tmp"))
-REPORTS = ROOT / "dada-reports"
-REPORTS.mkdir(parents=True, exist_ok=True)
+WORK = ROOT / "dada-reports"
+WORK.mkdir(parents=True, exist_ok=True)
 MAX_ARCHIVE = 12 * 1024 * 1024
 MAX_MEMBER = 12 * 1024 * 1024
 
@@ -34,10 +34,10 @@ archive_name = candidates[-1]
 encoded = json.loads(gh_api(
     f"repos/{PRIVATE_REPO}/contents/reports/{archive_name}?ref=main"
 ))["content"]
-archive_bytes = base64.b64decode(encoded)
+archive_bytes = base64.b64decode(encoded, validate=True)
 if len(archive_bytes) > MAX_ARCHIVE:
     raise SystemExit("Report archive exceeds the 12 MiB safety limit.")
-archive_path = REPORTS / archive_name
+archive_path = WORK / archive_name
 archive_path.write_bytes(archive_bytes)
 
 with zipfile.ZipFile(archive_path) as zf:
@@ -56,11 +56,12 @@ with zipfile.ZipFile(archive_path) as zf:
 
 patterns = [
     (re.compile(r"(?i)gh[pousr]_[A-Za-z0-9_]{20,}"), "[REDACTED_GITHUB_TOKEN]"),
-    (re.compile(r"(?i)Bearer\\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
-    (re.compile(r'(?i)("?\s*(?:password|passwd|pin|otp|token|authorization|cookie|session)"?\s*[:=]\s*")[^"]*(")'), r"\\1[REDACTED]\\2"),
+    (re.compile(r"(?i)Bearer\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
+    (re.compile(r'(?i)("?\\s*(?:password|passwd|pin|otp|token|authorization|cookie|session)"?\\s*[:=]\\s*")[^"]*(")'), r"\1[REDACTED]\2"),
     (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
     (re.compile(r"(?<!\\d)(?:\\+?\\d[\\s().-]*){9,14}(?!\\d)"), "[REDACTED_PHONE]"),
 ]
+
 def scrub(value):
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
     for pattern, replacement in patterns:
@@ -76,7 +77,7 @@ for line in payload.get("events.jsonl", "").splitlines():
     except json.JSONDecodeError:
         events.append({"parse_error": "Invalid JSONL line", "line_preview": scrub(line[:500])})
 
-out = REPORTS / (pathlib.Path(archive_name).stem + ".md")
+out = WORK / (pathlib.Path(archive_name).stem + ".md")
 parts = [
     f"# Parsed diagnostic report: {archive_name}", "",
     f"- Archive size: {len(archive_bytes)} bytes",
@@ -88,7 +89,7 @@ parts = [
     scrub(payload.get("device-summary.txt", "(missing)")), "~~~", "",
     "## Events (JSON)", "", "~~~json", scrub(events), "~~~", "",
 ]
-out.write_text("\\n".join(parts), encoding="utf-8")
+out.write_text("\n".join(parts), encoding="utf-8")
 print(f"Parsed {archive_name}: {len(events)} events; extracted report prepared for private upload.")
 
 content_b64 = base64.b64encode(out.read_bytes()).decode("ascii")
@@ -107,11 +108,10 @@ try:
     body_obj = json.loads(body)
     body_obj["sha"] = existing["sha"]
     body = json.dumps(body_obj)
-    method = "PUT"
 except subprocess.CalledProcessError:
-    method = "PUT"
+    pass
 subprocess.run(
-    ["gh", "api", "--method", method, endpoint, "--input", "-"],
+    ["gh", "api", "--method", "PUT", endpoint, "--input", "-"],
     input=body.encode(), env=env, check=True, stdout=subprocess.DEVNULL,
 )
 print(f"Saved parsed report privately as reports/parsed/{out.name}.")
