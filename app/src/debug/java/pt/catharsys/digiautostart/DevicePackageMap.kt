@@ -35,10 +35,14 @@ object DevicePackageMap {
         Thread({
             try {
                 val report = buildReport(activity)
-                DiagnosticsFeature.record(activity, "device_package_map_completed", "characters=${report.length}")
+                val evidence = runCatching { ApkEvidenceExtractor.extract(activity) }
+                    .getOrElse { "evidenceError=${it.javaClass.simpleName}:${it.message.orEmpty().take(180)}" }
+                val completeReport = "$report\n=== RAW APK EVIDENCE ===\n$evidence"
+                DiagnosticsFeature.record(activity, "device_package_map_completed",
+                    "characters=${completeReport.length};${evidence.replace("\n", ";")}")
                 activity.runOnUiThread {
                     progress.dismiss()
-                    if (!activity.isFinishing) showReport(activity, report)
+                    if (!activity.isFinishing) showReport(activity, completeReport)
                 }
             } catch (error: Throwable) {
                 DiagnosticsFeature.record(
