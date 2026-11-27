@@ -180,14 +180,24 @@ object DevicePackageMap {
         }
 
         val output = StringBuilder()
-        (metadata +
-            listOf("=== DIGI APK STRING SAMPLE (FILTERED) ===") + scanLines +
-            listOf("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===") + settingsScanLines
-        ).forEach { line ->
-            if (output.length + line.length + 1 <= 25000) output.append(line).append('\n')
+        fun appendSection(title: String, lines: List<String>, budget: Int) {
+            output.append(title).append('\n')
+            var used = title.length + 1
+            for (line in lines) {
+                if (used >= budget) break
+                val remaining = budget - used - 1
+                val clipped = if (line.length > remaining) line.take(remaining) else line
+                if (clipped.isNotEmpty()) {
+                    output.append(clipped).append('\n')
+                    used += clipped.length + 1
+                }
+            }
+            if (lines.isNotEmpty() && used >= budget) output.append("[section capped]\n")
         }
-        if (output.length >= 25000) output.append("[report capped after prioritised package metadata and targeted strings]\n")
-        return output.toString()
+        appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 9000)
+        appendSection("=== DIGI APK STRINGS (FILTERED) ===", scanLines, 7000)
+        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 9000)
+        return output.toString().take(25000)
     }
 
     /**
