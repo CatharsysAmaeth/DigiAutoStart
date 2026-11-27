@@ -83,7 +83,7 @@ internal object StaticDexProbe {
                     val signature = method.parameterTypes.joinToString(",") { it.toString() }
                     val methodId = "$type->${method.name}($signature)${method.returnType}"
                     val impl = method.implementation
-                    output += "dexContractMethod=$methodId;implemented=${impl != null};instructions=${impl?.instructions?.size ?: 0}"
+                    output += "dexContractMethod=$methodId;implemented=${impl != null};instructions=${impl?.instructions?.count() ?: 0}"
                     if (impl == null) continue
 
                     val instructions = impl.instructions.toList()
@@ -160,7 +160,7 @@ internal object StaticDexProbe {
         type.contains("IHgagentService") && type.contains("\$Stub", true) -> 2
         type.contains("IHgagentService") && type.contains("\$Proxy", true) -> 3
         type.endsWith("/IHgagentService;") -> 4
-        type.contains("TvSettingsService$1") -> 5
+        type.contains("TvSettingsService\\$1") -> 5
         else -> 6
     }
 
