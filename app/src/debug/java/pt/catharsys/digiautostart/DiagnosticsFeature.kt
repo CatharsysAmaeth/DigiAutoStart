@@ -184,11 +184,11 @@ object DiagnosticsFeature {
     /** Remove common credential, account-contact and phone-number patterns before export. */
     private fun redact(input: String): String {
         var value = input
-        value = value.replace(Regex("(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s\\\",]+"), "$1[REDACTED]")
+        value = value.replace(Regex("(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s\\\",]+"), "\$1[REDACTED]")
         value = value.replace(Regex("(?i)\\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b"), "[REDACTED_TOKEN]")
         value = value.replace(
             Regex("(?i)\\b(password|passwd|token|access[_-]?token|refresh[_-]?token|session(?:[_-]?id)?|api[_-]?key|pin|otp)\\s*[:=]\\s*(\"[^\"]*\"|'[^']*'|[^,\\s}]+)"),
-            "$1=[REDACTED]"
+            "\$1=[REDACTED]"
         )
         value = value.replace(Regex("(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b"), "[REDACTED_EMAIL]")
         value = value.replace(Regex("(?<![A-Za-z0-9])(?:\\+?\\d[\\d .()/-]{7,}\\d)(?![A-Za-z0-9])"), "[REDACTED_PHONE]")
