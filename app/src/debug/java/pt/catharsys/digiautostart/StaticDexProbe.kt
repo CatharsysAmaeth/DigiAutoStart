@@ -2,7 +2,10 @@ package pt.catharsys.digiautostart
 
 import org.jf.dexlib2.DexFileFactory
 import org.jf.dexlib2.Opcodes
+import org.jf.dexlib2.iface.instruction.NarrowLiteralInstruction
+import org.jf.dexlib2.iface.instruction.OffsetInstruction
 import org.jf.dexlib2.iface.instruction.ReferenceInstruction
+import org.jf.dexlib2.iface.instruction.WideLiteralInstruction
 import org.jf.dexlib2.iface.reference.FieldReference
 import org.jf.dexlib2.iface.reference.MethodReference
 import org.jf.dexlib2.iface.reference.StringReference
@@ -47,7 +50,7 @@ internal object StaticDexProbe {
                 for (method in methods) {
                     if (output.size >= 100) break
                     val impl = method.implementation ?: continue
-                    val signature = method.parameterTypes.joinToString("") { it.type }
+                    val signature = method.parameterTypes.joinToString("") { it.toString() }
                     val instructions = impl.instructions.toList()
                     output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
@@ -64,6 +67,11 @@ internal object StaticDexProbe {
                         }
                         val lower = refText.lowercase()
                         val opcode = instruction.opcode.name.lowercase()
+                        val operands = buildString {
+                            if (instruction is NarrowLiteralInstruction) append(" literal=${instruction.narrowLiteral}")
+                            if (instruction is WideLiteralInstruction) append(" literal=${instruction.wideLiteral}")
+                            if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
+                        }
                         val relevant = ref is MethodReference || ref is FieldReference ||
                             (ref is StringReference && (
                                 lower.contains("accessibility") || lower.contains("flavor") ||
@@ -76,7 +84,7 @@ internal object StaticDexProbe {
                             opcode.startsWith("const") || opcode.startsWith("if-") || opcode.startsWith("goto") ||
                             opcode.startsWith("return") || opcode.startsWith("throw")
                         if (relevant) {
-                            output += "dexInsn=$index:${instruction.opcode.name}$refText"
+                            output += "dexInsn=$index:${instruction.opcode.name}$refText$operands"
                             emitted++
                         }
                     }
