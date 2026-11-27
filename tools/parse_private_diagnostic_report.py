@@ -95,6 +95,7 @@ def run_jadx(dex_files, report_stem):
     if not executables:
         return ["jadx_executable=not_found"]
     jadx = str(executables[0])
+    os.chmod(jadx, 0o755)
     selected = {"digi": [], "zte-tv-settings": []}
     patterns = {
         "digi": re.compile(r"(?i)(MainActivity|MainApplication|ReactActivity|sendIntentAndroid|Linking|channel|livestream|player|Intent\.ACTION_VIEW)"),
