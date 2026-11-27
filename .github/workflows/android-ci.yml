@@ -107,13 +107,11 @@ jobs:
         env:
           DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
           DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
-          DADA_DEBUG_REPORT_PASSWORD: ${{ secrets.DADA_DEBUG_REPORT_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
           export DADA_PRIVATE_REPOSITORY_B64="$(printf '%s' "$DADA_PRIVATE_REPOSITORY" | base64 -w 0)"
           export DADA_PRIVATE_TOKEN_B64="$(printf '%s' "$DADA_PRIVATE_TOKEN" | base64 -w 0)"
-          export DADA_DEBUG_REPORT_PASSWORD_B64="$(printf '%s' "$DADA_DEBUG_REPORT_PASSWORD" | base64 -w 0)"
           gradle --no-daemon --stacktrace testAndroid12DebugUnitTest assembleAndroid12Debug assembleAndroid12Release assembleAndroid9Release
 
       - name: Verify Debug accessibility service is packaged
@@ -145,7 +143,6 @@ jobs:
           check_contains "$MANIFEST" 'DigiTvAccessibilityProbeService'
           check_contains "$MANIFEST" 'BIND_ACCESSIBILITY_SERVICE'
           check_contains "$MANIFEST" 'android.accessibilityservice.AccessibilityService'
-          # aapt resolves the manifest resource reference to a numeric ID; verify the XML resource itself below.
           check_contains "$XML" 'ro.digionline.tv'
           check_contains "$XML" 'canRetrieveWindowContent'
           echo "Debug accessibility service and its configuration are present in the APK."
@@ -170,7 +167,6 @@ jobs:
 
             if [ "$variant" = android12 ]; then
               grep -Fq 'FOREGROUND_SERVICE_SPECIAL_USE' "$MANIFEST"
-              # aapt renders this enum as its numeric bitmask (0x40000000), not the source token.
               grep -Eqi 'foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"
             else
               if grep -Eq 'FOREGROUND_SERVICE_SPECIAL_USE|PROPERTY_SPECIAL_USE_FGS_SUBTYPE|foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"; then
@@ -197,7 +193,7 @@ jobs:
             done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$'))"
 
             if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DADA_PRIVATE_(TOKEN|REPOSITORY)_B64|DADA_DEBUG_REPORT_PASSWORD_B64|Diagnósticos \\(Debug\\)|Verificar atualizações'; then
-              echo "Unexpected internal diagnostic or Debug updater code found in $variant Release APK"
+              echo "Unexpected Debug-only diagnostic or updater code found in $variant Release APK"
               exit 1
             fi
             for marker in wake_should_launch launch_digi_on_boot; do
