@@ -38,27 +38,28 @@ internal object StaticDexProbe {
             val selected = dex.classes.filter { clazz ->
                 classTargets.any { clazz.type.contains(it, ignoreCase = true) }
             }.sortedBy { it.type }
-            output += "dexDisassembly=$entryName;selectedClasses=\${selected.size}"
+            output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
             for (clazz in selected) {
                 if (output.size >= 180) break
-                output += "dexClass=\${clazz.type};super=\${clazz.superclass ?: "none"}"
+                output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
                     .sortedBy { it.name }
                 for (method in methods) {
                     if (output.size >= 180) break
                     val impl = method.implementation ?: continue
                     val signature = method.parameterTypes.joinToString("") { it.type }
-                    output += "dexMethod=\${clazz.type}->\${method.name}($signature)\${method.returnType};ins=\${impl.instructions.size}"
+                    val instructions = impl.instructions.toList()
+                    output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
-                    for ((index, instruction) in impl.instructions.withIndex()) {
+                    for ((index, instruction) in instructions.withIndex()) {
                         if (emitted >= 36 || output.size >= 180) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         val refText = when (ref) {
-                            is StringReference -> " str=\${ref.string.take(220)}"
-                            is MethodReference -> " method=\${ref.definingClass}->\${ref.name}(" +
-                                ref.parameterTypes.joinToString("") { it.toString() } + ")\${ref.returnType}"
-                            is TypeReference -> " type=\${ref.type}"
-                            is FieldReference -> " field=\${ref.definingClass}->\${ref.name}:\${ref.type}"
+                            is StringReference -> " str=${ref.string.take(220)}"
+                            is MethodReference -> " method=${ref.definingClass}->${ref.name}(" +
+                                ref.parameterTypes.joinToString("") { it.toString() } + ")${ref.returnType}"
+                            is TypeReference -> " type=${ref.type}"
+                            is FieldReference -> " field=${ref.definingClass}->${ref.name}:${ref.type}"
                             else -> ""
                         }
                         val lower = refText.lowercase()
@@ -70,14 +71,14 @@ internal object StaticDexProbe {
                             lower.contains("parcel") || lower.contains("enabled") ||
                             lower.contains("unsupported")
                         if (relevant) {
-                            output += "dexInsn=$index:\${instruction.opcode.name}$refText"
+                            output += "dexInsn=$index:${instruction.opcode.name}$refText"
                             emitted++
                         }
                     }
                 }
             }
         } catch (error: Throwable) {
-            output += "dexDisassemblyError=$entryName;\${error.javaClass.simpleName}:\${error.message.orEmpty().take(180)}"
+            output += "dexDisassemblyError=$entryName;${error.javaClass.simpleName}:${error.message.orEmpty().take(180)}"
         } finally {
             temp.delete()
         }
