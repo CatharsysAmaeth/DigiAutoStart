@@ -205,9 +205,9 @@ object DevicePackageMap {
             }
             if (lines.isNotEmpty() && used >= budget) output.append("[section capped]\n")
         }
-        appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 6500)
-        appendSection("=== DIGI APK STRINGS (FILTERED) ===", scanLines, 6500)
-        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 11500)
+        appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 4500)
+        appendSection("=== DIGI APK STRINGS (FILTERED) ===", scanLines, 9500)
+        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 10500)
         return output.toString().take(24500)
     }
 
