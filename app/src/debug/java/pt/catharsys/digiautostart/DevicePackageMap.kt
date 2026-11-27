@@ -225,7 +225,7 @@ object DevicePackageMap {
                 val matches = linkedSetOf<String>()
                 var totalBytes = 0
                 for (entry in entries) {
-                    if (totalBytes >= 12 * 1024 * 1024 || matches.size >= 75) break
+                    if (totalBytes >= 12 * 1024 * 1024) break
                     if (entry.size <= 0L || entry.size > 8L * 1024 * 1024) {
                         output += "settingsDexSkipped=${entry.name};size=${entry.size}"
                         continue
@@ -242,7 +242,7 @@ object DevicePackageMap {
                             "ZteKeyInterceptor|TvSettingsService)"
                     )
                     strings.filter { target.containsMatchIn(it) }.forEach { value ->
-                        if (matches.size < 75 && value.length <= 500) matches += "${entry.name}:${value}"
+                        if (matches.size < 35 && value.length <= 500) matches += "${entry.name}:${value}"
                     }
                 }
                 output += "settingsDexBytesScanned=$totalBytes;targetedStrings=${matches.size}"
