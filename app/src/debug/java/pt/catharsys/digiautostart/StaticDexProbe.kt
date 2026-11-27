@@ -3,6 +3,12 @@ package pt.catharsys.digiautostart
 import org.jf.dexlib2.DexFileFactory
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.iface.instruction.NarrowLiteralInstruction
+import org.jf.dexlib2.iface.instruction.OneRegisterInstruction
+import org.jf.dexlib2.iface.instruction.TwoRegisterInstruction
+import org.jf.dexlib2.iface.instruction.ThreeRegisterInstruction
+import org.jf.dexlib2.iface.instruction.FiveRegisterInstruction
+import org.jf.dexlib2.iface.instruction.RegisterRangeInstruction
+import org.jf.dexlib2.iface.instruction.SwitchPayload
 import org.jf.dexlib2.iface.instruction.OffsetInstruction
 import org.jf.dexlib2.iface.instruction.ReferenceInstruction
 import org.jf.dexlib2.iface.instruction.WideLiteralInstruction
@@ -67,18 +73,16 @@ internal object StaticDexProbe {
             for (clazz in selected) {
                 if (output.size >= 180) break
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
-                if (clazz.type.contains("FlavorUtils")) {
-                    clazz.fields.filter { it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) }
-                        .forEach { field ->
-                            val encoded = field.initialValue
-                            val value = when (encoded) {
-                                is IntEncodedValue -> encoded.value.toString()
-                                null -> "unset"
-                                else -> encoded.toString()
-                            }
-                            output += "dexStaticField=${field.name}:${field.type}=$value"
+                clazz.fields.filter { it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) }
+                    .forEach { field ->
+                        val encoded = field.initialValue
+                        val value = when (encoded) {
+                            is IntEncodedValue -> encoded.value.toString()
+                            null -> "unset"
+                            else -> encoded.toString()
                         }
-                }
+                        output += "dexStaticField=${clazz.type}->${field.name}:${field.type}=$value"
+                    }
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
                     .sortedBy { method ->
                         when (method.name) {
@@ -168,6 +172,19 @@ internal object StaticDexProbe {
                             }
                         }
                         val operands = buildString {
+                            if (fullFlavorMethod) {
+                                when (instruction) {
+                                    is FiveRegisterInstruction -> append(" regs=v${instruction.registerC},v${instruction.registerD},v${instruction.registerE},v${instruction.registerF},v${instruction.registerG}")
+                                    is ThreeRegisterInstruction -> append(" regs=v${instruction.registerA},v${instruction.registerB},v${instruction.registerC}")
+                                    is TwoRegisterInstruction -> append(" regs=v${instruction.registerA},v${instruction.registerB}")
+                                    is OneRegisterInstruction -> append(" regs=v${instruction.registerA}")
+                                    is RegisterRangeInstruction -> append(" regs=v${instruction.startRegister}..v${instruction.startRegister + instruction.registerCount - 1}")
+                                }
+                                if (instruction is SwitchPayload) {
+                                    append(" switch=")
+                                    append(instruction.switchElements.joinToString(",") { "${it.key}:${it.offset}" })
+                                }
+                            }
                             if (instruction is NarrowLiteralInstruction) {
                                 val literal = instruction.narrowLiteral
                                 if (literal > 99_999_999 || literal < -99_999_999) {
