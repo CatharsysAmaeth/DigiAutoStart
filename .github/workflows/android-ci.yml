@@ -263,9 +263,10 @@ jobs:
           VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
           VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
           APK_SHA256="$(sha256sum "$APK_DEBUG" | awk '{print $1}')"
+          echo "Validated Debug APK SHA-256: $APK_SHA256"
 
           # Keep every validated Debug build in the private diagnostics repository.
-          ARCHIVE_ID="run$GITHUB_RUN_ID"
+          ARCHIVE_ID="run$GITHUB_RUN_ID-attempt$GITHUB_RUN_ATTEMPT"
           ARCHIVE_APK="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.apk"
           ARCHIVE_META="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.json"
           base64 -w 0 "$APK_DEBUG" > /tmp/debug-archive-apk.base64
