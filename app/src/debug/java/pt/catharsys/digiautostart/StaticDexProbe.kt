@@ -30,7 +30,7 @@ internal object StaticDexProbe {
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
             "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|onCreatePreferences|" +
-            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
+            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel|finish|isStartupVerificationRequired|onActivityResult|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
     fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File) {
@@ -40,13 +40,34 @@ internal object StaticDexProbe {
             val dex = DexFileFactory.loadDexFile(temp, Opcodes.getDefault())
             val selected = dex.classes.filter { clazz ->
                 classTargets.any { clazz.type.contains(it, ignoreCase = true) }
-            }.sortedBy { it.type }
+            }.sortedBy { clazz ->
+                when {
+                    clazz.type.contains("TvSettingsActivity") -> 0
+                    clazz.type.contains("FlavorUtils") -> 1
+                    clazz.type.contains("oemlink/AccessibilityServiceActivity") -> 2
+                    clazz.type.contains("oemlink/AccessibilitySettingsActivity") -> 3
+                    clazz.type.contains("FeatureFactory") -> 4
+                    clazz.type.contains("AccessibilityServiceFragment") -> 5
+                    clazz.type.contains("ZteKeyInterceptor") -> 6
+                    else -> 7
+                }
+            }
             output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
             for (clazz in selected) {
                 if (output.size >= 100) break
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
-                    .sortedBy { it.name }
+                    .sortedBy { method ->
+                        when (method.name) {
+                            "onCreate" -> 0
+                            "finish" -> 1
+                            "getFlavor" -> 2
+                            "getAvailableFlavors" -> 3
+                            "createSettingsFragment" -> 4
+                            "getFeatureFactory" -> 5
+                            else -> 6
+                        }
+                    }
                 for (method in methods) {
                     if (output.size >= 100) break
                     val impl = method.implementation ?: continue
