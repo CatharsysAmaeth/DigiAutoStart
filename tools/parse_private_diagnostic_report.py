@@ -55,6 +55,14 @@ def put_private_file(path, data, message):
         stderr=subprocess.PIPE,
     )
 
+def put_private_chunks(path, data, message):
+    source = pathlib.PurePosixPath(path)
+    for part, offset in enumerate(range(0, len(data), MAX_ANALYSIS_FILE), start=1):
+        chunk = data[offset:offset + MAX_ANALYSIS_FILE]
+        suffix = f"-part{part:02d}" if len(data) > MAX_ANALYSIS_FILE else ""
+        target = str(source.with_name(source.stem + suffix + source.suffix))
+        put_private_file(target, chunk, message)
+
 def scrub(value):
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
     patterns = [
@@ -196,10 +204,9 @@ def run_hermes(bundle_path, report_stem):
             status.append(f"{command}=exit_{result.returncode}")
             if result.returncode == 0 and output_path.exists() and output_path.stat().st_size:
                 data = output_path.read_bytes()
-                if len(data) <= MAX_ANALYSIS_FILE:
-                    suffix = output_path.suffix or ".txt"
-                    private_name = f"reports/analysis/{report_stem}-hermes-{command}{suffix}"
-                    put_private_file(private_name, data, f"analysis: Hermes {command} output for {report_stem}")
+                suffix = output_path.suffix or ".txt"
+                private_name = f"reports/analysis/{report_stem}-hermes-{command}{suffix}"
+                put_private_chunks(private_name, data, f"analysis: Hermes {command} output for {report_stem}")
             if result.stderr:
                 err = result.stderr.decode("utf-8", errors="replace")[-4000:]
                 put_private_file(
