@@ -91,8 +91,19 @@ object DevicePackageMap {
             meta("sourceDir=${app.sourceDir};publicSourceDir=${app.publicSourceDir}")
             meta("splitSourceDirs=${app.splitSourceDirs?.joinToString("|")}")
             meta("targetSdk=${app.targetSdkVersion};minSdk=${app.minSdkVersion}")
-            info.activities.orEmpty().forEach { a ->
-                meta("activity=${a.name};exported=${a.exported};enabled=${a.enabled};permission=${a.permission};launchMode=${a.launchMode};process=${a.processName}")
+            val relevantActivities = info.activities.orEmpty().filter { a ->
+                if (pkg == DIGI) {
+                    a.name == "ro.digionline.tv.MainActivity" ||
+                        (a.exported && a.name.contains("link", ignoreCase = true))
+                } else {
+                    a.name == "com.android.tv.settings.MainSettings" ||
+                        a.name.contains("Accessibility", ignoreCase = true) ||
+                        a.name.contains("A11y", ignoreCase = true)
+                }
+            }
+            meta("activitiesTotal=${info.activities.orEmpty().size};relevantActivities=${relevantActivities.size}")
+            relevantActivities.forEach { a ->
+                meta("activity=${a.name};exported=${a.exported};enabled=${a.enabled};permission=${a.permission};launchMode=${a.launchMode}")
             }
             info.services.orEmpty().forEach { s ->
                 meta("service=${s.name};exported=${s.exported};enabled=${s.enabled};permission=${s.permission}")
@@ -194,10 +205,10 @@ object DevicePackageMap {
             }
             if (lines.isNotEmpty() && used >= budget) output.append("[section capped]\n")
         }
-        appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 8500)
+        appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 6500)
         appendSection("=== DIGI APK STRINGS (FILTERED) ===", scanLines, 6500)
-        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 8500)
-        return output.toString().take(25000)
+        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 11500)
+        return output.toString().take(24500)
     }
 
     /**
@@ -214,7 +225,7 @@ object DevicePackageMap {
                 val matches = linkedSetOf<String>()
                 var totalBytes = 0
                 for (entry in entries) {
-                    if (totalBytes >= 12 * 1024 * 1024 || matches.size >= 120) break
+                    if (totalBytes >= 12 * 1024 * 1024 || matches.size >= 75) break
                     if (entry.size <= 0L || entry.size > 8L * 1024 * 1024) {
                         output += "settingsDexSkipped=${entry.name};size=${entry.size}"
                         continue
@@ -230,7 +241,7 @@ object DevicePackageMap {
                             "ZteKeyInterceptor|TvSettingsService)"
                     )
                     strings.filter { target.containsMatchIn(it) }.forEach { value ->
-                        if (matches.size < 120 && value.length <= 500) matches += "${entry.name}:${value}"
+                        if (matches.size < 75 && value.length <= 500) matches += "${entry.name}:${value}"
                     }
                 }
                 output += "settingsDexBytesScanned=$totalBytes;targetedStrings=${matches.size}"
