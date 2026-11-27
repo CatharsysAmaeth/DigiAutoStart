@@ -56,17 +56,19 @@ for build in HISTORICAL_BUILDS:
 
     with tempfile.TemporaryDirectory(prefix="dada-debug-recovery-") as tmp:
         apk_path = pathlib.Path(tmp) / "historical-debug.apk"
-        encoded_path = pathlib.Path(tmp) / "apk-content.json"
-        gh_api(
-            f"repos/{PRIVATE_REPO}/contents/apk/DigiAutoStart-debug.apk?ref={ref}",
-            output=encoded_path,
-        )
-        content = json.loads(encoded_path.read_text(encoding="utf-8"))["content"]
-        apk_path.write_bytes(base64.b64decode("".join(content.split()), validate=True))
+        env = os.environ.copy()
+        env["GH_TOKEN"] = TOKEN
+        with apk_path.open("wb") as stream:
+            subprocess.run(
+                ["gh", "api", "-H", "Accept: application/vnd.github.raw",
+                 f"repos/{PRIVATE_REPO}/contents/apk/DigiAutoStart-debug.apk?ref={ref}"],
+                env=env, check=True, stdout=stream,
+            )
         actual_sha = hashlib.sha256(apk_path.read_bytes()).hexdigest()
         if actual_sha != expected_sha:
             raise SystemExit(
-                f"Historical APK SHA-256 mismatch for {build['versionName']}; refusing to archive."
+                f"Historical APK SHA-256 mismatch for {build['versionName']}: "
+                f"expected {expected_sha}, got {actual_sha}; refusing to archive."
             )
         encoded = base64.b64encode(apk_path.read_bytes()).decode("ascii")
         body = json.dumps({
