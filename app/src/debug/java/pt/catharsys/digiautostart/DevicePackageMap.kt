@@ -316,6 +316,7 @@ object DevicePackageMap {
                 output += "selectedEntries=${entries.size}"
                 val found = linkedSetOf<String>()
                 val sourceMapMatches = linkedSetOf<String>()
+                val bundleContexts = linkedSetOf<String>()
                 var totalBytesRead = 0
                 val maxTotalBytes = 10 * 1024 * 1024
                 for (entry in entries) {
@@ -368,6 +369,20 @@ object DevicePackageMap {
                         }
                     }
                     val raw = bytes.toString(Charsets.ISO_8859_1)
+                    if (entry.name.contains("bundle", true)) {
+                        val contextTerms = Regex("(?i)(common_id|ia-livestream|/api/vod/play/api/channel|stream/|navigate|linking|deep.?link|epg|livestream|player)")
+                        for (match in contextTerms.findAll(raw).take(40)) {
+                            val start = maxOf(0, match.range.first - 180)
+                            val end = minOf(raw.length, match.range.last + 220)
+                            val context = raw.substring(start, end)
+                                .map { ch -> if (ch.code in 0x20..0x7e) ch else ' ' }
+                                .joinToString("")
+                                .replace(Regex("\\s+"), " ")
+                                .trim()
+                            if (context.isNotBlank()) bundleContexts += context.take(420)
+                            if (bundleContexts.size >= 25) break
+                        }
+                    }
                     uriPattern.findAll(raw).forEach { match ->
                         val uri = match.value.trimEnd('.', ',', ';', ')', ']', '}')
                         if (uri.length in 8..300) discoveredUris += uri
@@ -380,9 +395,10 @@ object DevicePackageMap {
                         }
                     }
                 }
-                output += "apkBytesScanned=$totalBytesRead;relevantStrings=${found.size};uriLiterals=${discoveredUris.size};sourceMapMatches=${sourceMapMatches.size}"
+                output += "apkBytesScanned=$totalBytesRead;relevantStrings=${found.size};uriLiterals=${discoveredUris.size};sourceMapMatches=${sourceMapMatches.size};bundleContexts=${bundleContexts.size}"
                 found.forEach { output += "apkString=$it" }
                 sourceMapMatches.forEach { output += "sourceMapMatch=$it" }
+                bundleContexts.forEach { output += "bundleContext=$it" }
             }
         } catch (e: Exception) {
             output += "apkScanError=${File(path).name};${e.javaClass.simpleName}:${e.message}"
