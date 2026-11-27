@@ -40,7 +40,7 @@ internal object StaticDexProbe {
             }.sortedBy { it.type }
             output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
             for (clazz in selected) {
-                if (output.size >= 180) break
+                if (output.size >= 100) break
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
                     .sortedBy { it.name }
@@ -52,10 +52,10 @@ internal object StaticDexProbe {
                     output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= 36 || output.size >= 180) break
+                        if (emitted >= 18 || output.size >= 180) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         val refText = when (ref) {
-                            is StringReference -> " str=${ref.string.take(220)}"
+                            is StringReference -> " str=${ref.string.take(160)}"
                             is MethodReference -> " method=${ref.definingClass}->${ref.name}(" +
                                 ref.parameterTypes.joinToString("") { it.toString() } + ")${ref.returnType}"
                             is TypeReference -> " type=${ref.type}"
