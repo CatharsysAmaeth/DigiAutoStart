@@ -71,12 +71,21 @@ def run_hermes(bundle_path, report_stem):
     status = []
     output_dir = WORK / (report_stem + "-hermes")
     output_dir.mkdir(parents=True, exist_ok=True)
-    install = subprocess.run(
-        ["python3", "-m", "pip", "install", "--quiet", "hermes-dec==0.1.8"],
+    venv = WORK / (report_stem + "-hermes-venv")
+    create_venv = subprocess.run(
+        ["python3", "-m", "venv", str(venv)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
-        timeout=180,
+        timeout=60,
     )
+    install = create_venv
+    if create_venv.returncode == 0:
+        install = subprocess.run(
+            [str(venv / "bin" / "pip"), "install", "--quiet", "hermes-dec==0.1.8"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            timeout=180,
+        )
     if install.returncode != 0:
         status.append("hermes_install=failed")
         detail = (install.stderr or b"").decode("utf-8", errors="replace")[-2000:]
@@ -87,9 +96,8 @@ def run_hermes(bundle_path, report_stem):
         )
         return status
 
-    local_bin = pathlib.Path.home() / ".local" / "bin"
     env = os.environ.copy()
-    env["PATH"] = str(local_bin) + os.pathsep + env.get("PATH", "")
+    env["PATH"] = str(venv / "bin") + os.pathsep + env.get("PATH", "")
     commands = [
         ("hbc-file-parser", [str(bundle_path)], output_dir / "header.txt", True),
         ("hbc-disassembler", [str(bundle_path), str(output_dir / "bundle.hasm")], output_dir / "disassembler.stdout.txt", False),
@@ -223,7 +231,7 @@ for archive_name in archive_names:
         *[f"- {scrub(record)}" for record in evidence_records],
         "",
         "## Hermes analysis status", "",
-        *[f"- {item}" for item in hermes_status] if hermes_status else ["- No Hermes bundle found in this report."],
+        *([f"- {item}" for item in hermes_status] if hermes_status else ["- No Hermes bundle found in this report."]),
         "",
         "## Events (JSON)", "", "~~~json", scrub(events), "~~~", "",
     ]
