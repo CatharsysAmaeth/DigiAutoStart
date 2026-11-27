@@ -119,3 +119,5 @@ for archive_name in archive_names:
         input=body.encode(), env=env, check=True, stdout=subprocess.DEVNULL,
     )
     print(f"Saved parsed report privately as reports/parsed/{out.name}.")
+
+# Re-run parser after receipt of the 2026-11-27 21:21:25 private diagnostic report.
