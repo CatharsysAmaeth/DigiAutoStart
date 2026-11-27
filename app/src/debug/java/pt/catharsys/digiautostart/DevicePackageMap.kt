@@ -223,8 +223,8 @@ object DevicePackageMap {
         }
         appendSection("=== PACKAGE METADATA AND URI ROUTES ===", metadata, 4500)
         appendSection("=== DIGI APK STRINGS (FILTERED) ===", scanLines, 9500)
-        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 10500)
-        return output.toString().take(24500)
+        appendSection("=== TV SETTINGS DEX STRINGS (TARGETED, STATIC) ===", settingsScanLines, 16000)
+        return output.toString().take(30000)
     }
 
     /**
