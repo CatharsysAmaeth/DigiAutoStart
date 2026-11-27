@@ -27,7 +27,7 @@ internal object StaticDexProbe {
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
             "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|onCreatePreferences|" +
-            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel)"
+            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
     fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>) {
@@ -45,14 +45,14 @@ internal object StaticDexProbe {
                 val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
                     .sortedBy { it.name }
                 for (method in methods) {
-                    if (output.size >= 180) break
+                    if (output.size >= 100) break
                     val impl = method.implementation ?: continue
                     val signature = method.parameterTypes.joinToString("") { it.type }
                     val instructions = impl.instructions.toList()
                     output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= 18 || output.size >= 180) break
+                        if (emitted >= 18 || output.size >= 100) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         val refText = when (ref) {
                             is StringReference -> " str=${ref.string.take(160)}"
@@ -63,13 +63,18 @@ internal object StaticDexProbe {
                             else -> ""
                         }
                         val lower = refText.lowercase()
-                        val relevant = ref == null || lower.contains("accessibility") ||
-                            lower.contains("flavor") || lower.contains("fragment") ||
-                            lower.contains("factory") || lower.contains("settings") ||
-                            lower.contains("zte") || lower.contains("service") ||
-                            lower.contains("activity") || lower.contains("intent") ||
-                            lower.contains("parcel") || lower.contains("enabled") ||
-                            lower.contains("unsupported")
+                        val opcode = instruction.opcode.name.lowercase()
+                        val relevant = ref is MethodReference ||
+                            (ref is StringReference && (
+                                lower.contains("accessibility") || lower.contains("flavor") ||
+                                    lower.contains("unsupported") || lower.contains("service")
+                            )) ||
+                            (ref is TypeReference && (
+                                lower.contains("accessibility") || lower.contains("fragment") ||
+                                    lower.contains("factory") || lower.contains("service")
+                            )) ||
+                            opcode.startsWith("if-") || opcode.startsWith("goto") ||
+                            opcode.startsWith("return") || opcode.startsWith("throw")
                         if (relevant) {
                             output += "dexInsn=$index:${instruction.opcode.name}$refText"
                             emitted++
