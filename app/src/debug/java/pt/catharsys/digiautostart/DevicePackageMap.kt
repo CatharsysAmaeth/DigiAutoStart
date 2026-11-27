@@ -105,13 +105,28 @@ object DevicePackageMap {
             relevantActivities.forEach { a ->
                 meta("activity=${a.name};exported=${a.exported};enabled=${a.enabled};permission=${a.permission};launchMode=${a.launchMode}")
             }
-            info.services.orEmpty().forEach { s ->
+            val relevantServices = info.services.orEmpty().filter { s ->
+                s.name.contains("accessibility", true) || s.name.contains("TvSettings", true) ||
+                    s.name.contains("Zte", true)
+            }
+            meta("servicesTotal=${info.services.orEmpty().size};relevantServices=${relevantServices.size}")
+            relevantServices.forEach { s ->
                 meta("service=${s.name};exported=${s.exported};enabled=${s.enabled};permission=${s.permission}")
             }
-            info.receivers.orEmpty().forEach { r ->
+            val relevantReceivers = info.receivers.orEmpty().filter { r ->
+                r.name.contains("accessibility", true) || r.name.contains("TvSettings", true) ||
+                    r.name.contains("Zte", true)
+            }
+            meta("receiversTotal=${info.receivers.orEmpty().size};relevantReceivers=${relevantReceivers.size}")
+            relevantReceivers.forEach { r ->
                 meta("receiver=${r.name};exported=${r.exported};enabled=${r.enabled};permission=${r.permission}")
             }
-            info.providers.orEmpty().forEach { p ->
+            val relevantProviders = info.providers.orEmpty().filter { p ->
+                p.name.contains("accessibility", true) || p.name.contains("TvSettings", true) ||
+                    p.name.contains("Zte", true)
+            }
+            meta("providersTotal=${info.providers.orEmpty().size};relevantProviders=${relevantProviders.size}")
+            relevantProviders.forEach { p ->
                 meta("provider=${p.name};exported=${p.exported};authority=${p.authority};permission=${p.readPermission}")
             }
             val launchIntent = pm.getLaunchIntentForPackage(pkg)
