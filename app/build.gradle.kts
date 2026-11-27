@@ -81,4 +81,5 @@ android {
 dependencies {
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.core:core:1.17.0")
+    debugImplementation("org.smali:dexlib2:2.5.2")
 }
