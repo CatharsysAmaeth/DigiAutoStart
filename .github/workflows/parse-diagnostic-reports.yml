@@ -1,4 +1,5 @@
 name: Parse private DAdA diagnostic report
+run-name: Parse latest private DAdA report
 
 on:
   push:
