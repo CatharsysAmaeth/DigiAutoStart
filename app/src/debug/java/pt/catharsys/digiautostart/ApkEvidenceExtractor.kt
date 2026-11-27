@@ -67,6 +67,7 @@ internal object ApkEvidenceExtractor {
         for (apkPath in apkPaths) {
             val apkFile = File(apkPath)
             val apkLabel = apkFile.nameWithoutExtension.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            var activeDestination: File? = null
             try {
                 ZipFile(apkFile).use { zip ->
                     val entries = zip.entries().asSequence()
@@ -90,11 +91,12 @@ internal object ApkEvidenceExtractor {
                             continue
                         }
                         val relative = "$folder/$apkLabel/${entry.name}"
-                        if (relative.split('/').any { it == ".." }) {
+                        if (relative.startsWith("/") || relative.split('/').any { it == ".." }) {
                             lines += "skipped=${apkFile.name}:${entry.name};reason=unsafe_path"
                             continue
                         }
                         val destination = File(root, relative)
+                        activeDestination = destination
                         destination.parentFile?.mkdirs()
                         val digest = MessageDigest.getInstance("SHA-256")
                         var copied = 0L
@@ -118,12 +120,14 @@ internal object ApkEvidenceExtractor {
                             lines += "failed=${apkFile.name}:${entry.name};expected=$size;actual=$copied"
                             continue
                         }
-                        val sha = digest.digest().joinToString("") { "%02x".format(it) }
+                        val sha = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
                         lines += "copied=$relative;bytes=$copied;sha256=$sha;apk=${apkFile.name};compressed=${entry.compressedSize}"
+                        activeDestination = null
                         consumeBudget(copied)
                     }
                 }
             } catch (error: Exception) {
+                activeDestination?.delete()
                 lines += "apkReadError=${apkFile.name};${error.javaClass.simpleName}:${error.message.orEmpty().take(180)}"
             }
         }
