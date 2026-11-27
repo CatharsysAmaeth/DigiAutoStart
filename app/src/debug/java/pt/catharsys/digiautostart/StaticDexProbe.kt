@@ -35,13 +35,17 @@ internal object StaticDexProbe {
         "/SettingsFragmentProvider;",
         "/accessibility/AccessibilityServiceFragment;",
         "/accessibility/AccessibilityServiceConfirmationFragment;",
-        "/ZteKeyInterceptor",
-        "/TvSettingsService"
+        "/TvSettingsService",
+        "/aidl/",
+        "/ZteKeyInterceptor"
     )
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
             "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|isTwoPanel|onCreatePreferences|" +
-            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
+            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|" +
+            "onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact|asBinder|asInterface|" +
+            "getInterfaceDescriptor|getTransactionName|getDefaultTransactionName|attachInterface|" +
+            "queryLocalInterface|enforceInterface|enforceNoDataAvail|writeTransactionToParcel)"
     )
 
     fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File, context: Context) {
@@ -53,16 +57,18 @@ internal object StaticDexProbe {
                 classTargets.any { clazz.type.contains(it, ignoreCase = true) }
             }.sortedBy { clazz ->
                 when {
-                    clazz.type.contains("TvSettingsActivity") -> 0
-                    clazz.type.contains("FlavorUtils") -> 1
-                    clazz.type.contains("oemlink/AccessibilityServiceActivity") -> 2
-                    clazz.type.contains("oemlink/AccessibilitySettingsActivity") -> 3
-                    clazz.type.contains("FeatureFactoryImplX") -> 4
-                    clazz.type.contains("FeatureFactoryImplTwoPanel") -> 5
-                    clazz.type.contains("FeatureFactoryImpl") -> 6
-                    clazz.type.contains("AccessibilityServiceFragment") -> 7
-                    clazz.type.contains("ZteKeyInterceptor") -> 8
-                    else -> 7
+                    clazz.type.contains("TvSettingsService") -> 0
+                    clazz.type.contains("/aidl/") -> 1
+                    clazz.type.contains("TvSettingsActivity") -> 2
+                    clazz.type.contains("FlavorUtils") -> 3
+                    clazz.type.contains("oemlink/AccessibilityServiceActivity") -> 4
+                    clazz.type.contains("oemlink/AccessibilitySettingsActivity") -> 5
+                    clazz.type.contains("FeatureFactoryImplX") -> 6
+                    clazz.type.contains("FeatureFactoryImplTwoPanel") -> 7
+                    clazz.type.contains("FeatureFactoryImpl") -> 8
+                    clazz.type.contains("AccessibilityServiceFragment") -> 9
+                    clazz.type.contains("ZteKeyInterceptor") -> 10
+                    else -> 11
                 }
             }
             output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
@@ -71,9 +77,19 @@ internal object StaticDexProbe {
             }.getOrNull()
             val queriedResources = linkedSetOf<String>()
             for (clazz in selected) {
-                if (output.size >= 180) break
+                if (output.size >= 420) break
+                val binderClass = clazz.type.contains("TvSettingsService", true) ||
+                    clazz.type.contains("/aidl/", true) ||
+                    clazz.type.contains("$" + "Stub", true) ||
+                    clazz.type.contains("$" + "Proxy", true)
                 output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
-                clazz.fields.filter { it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) }
+                if (binderClass) {
+                    output += "dexBinderClass=${clazz.type};interfaces=${clazz.interfaces.joinToString(",")};accessFlags=${clazz.accessFlags}"
+                }
+                clazz.fields.filter {
+                    binderClass || it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) ||
+                        it.name.contains("DESCRIPTOR", true) || it.name.contains("TRANSACTION", true)
+                }
                     .forEach { field ->
                         val encoded = field.initialValue
                         val value = when (encoded) {
@@ -83,7 +99,7 @@ internal object StaticDexProbe {
                         }
                         output += "dexStaticField=${clazz.type}->${field.name}:${field.type}=$value"
                     }
-                val methods = clazz.methods.filter { methodTargets.containsMatchIn(it.name) }
+                val methods = clazz.methods.filter { binderClass || methodTargets.containsMatchIn(it.name) }
                     .sortedBy { method ->
                         when (method.name) {
                             "onCreate" -> 0
@@ -100,14 +116,20 @@ internal object StaticDexProbe {
                         }
                     }
                 for (method in methods) {
-                    if (output.size >= 180) break
-                    val impl = method.implementation ?: continue
+                    if (output.size >= 420) break
+                    val impl = method.implementation
+                    if (impl == null) {
+                        if (binderClass) output += "dexBinderMethod=${clazz.type}->${method.name};params=${method.parameterTypes.joinToString(",")};return=${method.returnType};nativeOrAbstract=true"
+                        continue
+                    }
                     val signature = method.parameterTypes.joinToString("") { it.toString() }
                     val instructions = impl.instructions.toList()
-                    output += "dexMethod=${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
+                    output += (if (binderClass) "dexBinderMethod=" else "dexMethod=") +
+                        "${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
                     var emitted = 0
                     val fullFlavorMethod = clazz.type.contains("FlavorUtils") && method.name == "getFlavor"
                     val maxInstructions = when {
+                        binderClass -> 96
                         fullFlavorMethod -> 220
                         clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory" -> 100
                         method.name in setOf(
@@ -117,7 +139,7 @@ internal object StaticDexProbe {
                         else -> 10
                     }
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= maxInstructions || output.size >= 180) break
+                        if (emitted >= maxInstructions || output.size >= 420) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
                         if (ref is FieldReference && settingsResources != null) {
                             val resourceType = when {
@@ -196,7 +218,7 @@ internal object StaticDexProbe {
                             if (instruction is WideLiteralInstruction) append(" literal=${instruction.wideLiteral}")
                             if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
                         }
-                        val relevant = fullFlavorMethod || (clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory") ||
+                        val relevant = binderClass || fullFlavorMethod || (clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory") ||
                             ref is MethodReference || ref is FieldReference ||
                             (ref is StringReference && (
                                 lower.contains("accessibility") || lower.contains("flavor") ||
