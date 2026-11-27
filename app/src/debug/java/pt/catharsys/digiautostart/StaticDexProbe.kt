@@ -64,7 +64,7 @@ internal object StaticDexProbe {
                         }
                         val lower = refText.lowercase()
                         val opcode = instruction.opcode.name.lowercase()
-                        val relevant = ref is MethodReference ||
+                        val relevant = ref is MethodReference || ref is FieldReference ||
                             (ref is StringReference && (
                                 lower.contains("accessibility") || lower.contains("flavor") ||
                                     lower.contains("unsupported") || lower.contains("service")
@@ -73,7 +73,7 @@ internal object StaticDexProbe {
                                 lower.contains("accessibility") || lower.contains("fragment") ||
                                     lower.contains("factory") || lower.contains("service")
                             )) ||
-                            opcode.startsWith("if-") || opcode.startsWith("goto") ||
+                            opcode.startsWith("const") || opcode.startsWith("if-") || opcode.startsWith("goto") ||
                             opcode.startsWith("return") || opcode.startsWith("throw")
                         if (relevant) {
                             output += "dexInsn=$index:${instruction.opcode.name}$refText"
