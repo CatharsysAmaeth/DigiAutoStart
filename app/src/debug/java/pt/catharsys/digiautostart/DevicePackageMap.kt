@@ -2,11 +2,13 @@ package pt.catharsys.digiautostart
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.widget.ScrollView
 import android.widget.TextView
 import java.io.File
@@ -27,6 +29,43 @@ object DevicePackageMap {
     private val uriPattern = Regex("(?i)\\b([a-z][a-z0-9+.-]{1,24})://[a-z0-9._~:/?#\\[\\]@!$&'()*+,;=%-]*")
 
     fun run(activity: Activity) {
+        DiagnosticsFeature.record(activity, "device_package_map_started")
+        val progress = ProgressDialog.show(
+            activity,
+            "Mapeamento técnico",
+            "A analisar os APKs instalados. Aguarda…",
+            true,
+            false
+        )
+        Thread({
+            try {
+                val report = buildReport(activity)
+                DiagnosticsFeature.record(activity, "device_package_map_completed", "characters=${report.length}")
+                activity.runOnUiThread {
+                    progress.dismiss()
+                    if (!activity.isFinishing) showReport(activity, report)
+                }
+            } catch (error: Throwable) {
+                DiagnosticsFeature.record(
+                    activity,
+                    "device_package_map_failed",
+                    "type=${error.javaClass.name};message=${error.message};stack=${Log.getStackTraceString(error).take(3000)}"
+                )
+                activity.runOnUiThread {
+                    progress.dismiss()
+                    if (!activity.isFinishing) {
+                        AlertDialog.Builder(activity)
+                            .setTitle("Falha no mapeamento")
+                            .setMessage("A análise foi interrompida. O erro ficou registado nos Diagnósticos (Debug).\n\n${error.javaClass.simpleName}: ${error.message ?: "sem detalhe"}")
+                            .setPositiveButton("Fechar", null)
+                            .show()
+                    }
+                }
+            }
+        }, "dada-device-package-map").start()
+    }
+
+    private fun buildReport(activity: Activity): String {
         val pm = activity.packageManager
         val lines = mutableListOf<String>()
         fun add(value: String) { lines += value }
@@ -118,7 +157,10 @@ object DevicePackageMap {
             add("uriScheme=$scheme;handlers=${matches.joinToString("|") { it.activityInfo.name }}")
         }
 
-        val report = lines.joinToString("\n").take(26000)
+        return lines.joinToString("\n").take(26000)
+    }
+
+    private fun showReport(activity: Activity, report: String) {
         DiagnosticsFeature.record(activity, "device_package_map", report)
         val view = TextView(activity).apply {
             text = report
@@ -139,14 +181,33 @@ object DevicePackageMap {
             ZipFile(File(path)).use { zip ->
                 val entries = zip.entries().asSequence().filter {
                     it.name.matches(Regex("classes[0-9]*\\.dex")) ||
-                        it.name.startsWith("assets/") ||
-                        it.name == "resources.arsc"
-                }.take(80).toList()
-                add("apkEntriesScanned=${entries.size}")
+                        (it.name.startsWith("assets/") && !it.isDirectory)
+                }.take(30).toList()
+                add("apkEntriesSelected=${entries.size}")
                 val found = linkedSetOf<String>()
+                var totalBytesRead = 0
+                val maxTotalBytes = 12 * 1024 * 1024
                 for (entry in entries) {
-                    if (entry.isDirectory || entry.size > 24L * 1024 * 1024) continue
-                    val bytes = zip.getInputStream(entry).use { it.readBytes() }
+                    if (totalBytesRead >= maxTotalBytes || found.size >= 100) break
+                    if (entry.isDirectory || entry.size == 0L) continue
+                    val entryLimit = minOf(4 * 1024 * 1024, maxTotalBytes - totalBytesRead)
+                    if (entry.size > entryLimit.toLong()) {
+                        add("apkEntrySkipped=${entry.name};size=${entry.size};reason=per_entry_limit")
+                        continue
+                    }
+                    val bytes = zip.getInputStream(entry).use { input ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        var remaining = entryLimit
+                        while (remaining > 0) {
+                            val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            remaining -= count
+                        }
+                        output.toByteArray()
+                    }
+                    totalBytesRead += bytes.size
                     val raw = bytes.toString(Charsets.ISO_8859_1)
                     for (match in Regex("[\\x20-\\x7E]{5,240}").findAll(raw)) {
                         val value = match.value.trim()
@@ -155,8 +216,8 @@ object DevicePackageMap {
                             if (found.size >= 100) break
                         }
                     }
-                    if (found.size >= 100) break
                 }
+                add("apkBytesScanned=$totalBytesRead")
                 add("apkRelevantStringsCount=${found.size}")
                 found.forEach { add("apkString=$it") }
             }
