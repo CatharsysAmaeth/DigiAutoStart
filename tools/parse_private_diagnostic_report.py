@@ -57,9 +57,9 @@ with zipfile.ZipFile(archive_path) as zf:
 patterns = [
     (re.compile(r"(?i)gh[pousr]_[A-Za-z0-9_]{20,}"), "[REDACTED_GITHUB_TOKEN]"),
     (re.compile(r"(?i)Bearer\s+[A-Za-z0-9._~+/-]+=*"), "Bearer [REDACTED]"),
-    (re.compile(r'(?i)("?\\s*(?:password|passwd|pin|otp|token|authorization|cookie|session)"?\\s*[:=]\\s*")[^"]*(")'), r"\1[REDACTED]\2"),
-    (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
-    (re.compile(r"(?<!\\d)(?:\\+?\\d[\\s().-]*){9,14}(?!\\d)"), "[REDACTED_PHONE]"),
+    (re.compile(r'(?i)("?\s*(?:password|passwd|pin|otp|token|authorization|cookie|session)"?\s*[:=]\s*")[^"]*(")'), r"\1[REDACTED]\2"),
+    (re.compile(r"(?i)[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}"), "[REDACTED_EMAIL]"),
+    (re.compile(r"(?<!\d)(?:\+?\d[\s().-]*){9,14}(?!\d)"), "[REDACTED_PHONE]"),
 ]
 
 def scrub(value):
