@@ -22,22 +22,12 @@ import java.io.File
 
 /** Debug-only, read-only disassembly of selected TvSettings methods. */
 internal object StaticDexProbe {
+    // The accessibility flavor gate is already conclusively mapped. Keep this probe
+    // narrowly scoped so the ZTE gateway AIDL contract cannot be truncated by unrelated classes.
     private val classTargets = listOf(
-        "/oemlink/AccessibilityServiceActivity;",
-        "/oemlink/AccessibilitySettingsActivity;",
-        "/TvSettingsActivity;",
-        "/overlay/FlavorUtils;",
-        "/library/overlay/FlavorUtils;",
-        "/overlay/FeatureFactoryImpl;",
-        "/overlay/FeatureFactoryImplX;",
-        "/overlay/FeatureFactoryImplTwoPanel;",
-        "/accessibility/AccessibilityFragment;",
-        "/SettingsFragmentProvider;",
-        "/accessibility/AccessibilityServiceFragment;",
-        "/accessibility/AccessibilityServiceConfirmationFragment;",
         "/TvSettingsService",
-        "/aidl/",
-        "/ZteKeyInterceptor"
+        "/SettingsInterfaceImp",
+        "/IHgagentService"
     )
     private val methodTargets = Regex(
         "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
@@ -57,18 +47,13 @@ internal object StaticDexProbe {
                 classTargets.any { clazz.type.contains(it, ignoreCase = true) }
             }.sortedBy { clazz ->
                 when {
-                    clazz.type.contains("TvSettingsService") -> 0
-                    clazz.type.contains("/aidl/") -> 1
-                    clazz.type.contains("TvSettingsActivity") -> 2
-                    clazz.type.contains("FlavorUtils") -> 3
-                    clazz.type.contains("oemlink/AccessibilityServiceActivity") -> 4
-                    clazz.type.contains("oemlink/AccessibilitySettingsActivity") -> 5
-                    clazz.type.contains("FeatureFactoryImplX") -> 6
-                    clazz.type.contains("FeatureFactoryImplTwoPanel") -> 7
-                    clazz.type.contains("FeatureFactoryImpl") -> 8
-                    clazz.type.contains("AccessibilityServiceFragment") -> 9
-                    clazz.type.contains("ZteKeyInterceptor") -> 10
-                    else -> 11
+                    clazz.type.contains("TvSettingsService", true) -> 0
+                    clazz.type.contains("IHgagentService", true) && (
+                        clazz.type.contains("$Stub", true) || clazz.type.contains("$Proxy", true)
+                    ) -> 1
+                    clazz.type.contains("IHgagentService", true) -> 2
+                    clazz.type.contains("SettingsInterfaceImp", true) -> 3
+                    else -> 4
                 }
             }
             output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
@@ -77,7 +62,7 @@ internal object StaticDexProbe {
             }.getOrNull()
             val queriedResources = linkedSetOf<String>()
             for (clazz in selected) {
-                if (output.size >= 420) break
+                if (output.size >= 700) break
                 val binderClass = clazz.type.contains("TvSettingsService", true) ||
                     clazz.type.contains("/aidl/", true) ||
                     clazz.type.contains("\$Stub", true) ||
