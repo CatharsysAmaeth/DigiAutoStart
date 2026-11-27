@@ -1,0 +1,34 @@
+name: Archive historical private Debug builds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/archive-historical-debug.yml"
+      - "tools/archive_historical_debug_apks.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover-private-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out public workflow code
+        uses: actions/checkout@v7
+
+      - name: Recover historical Debug APKs into the private repository
+        env:
+          GH_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
+          DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
+          DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DADA_PRIVATE_TOKEN:-}" ] || [ -z "${DADA_PRIVATE_REPOSITORY:-}" ]; then
+            echo "::error::Private diagnostics credentials are not configured."
+            exit 1
+          fi
+          python3 tools/archive_historical_debug_apks.py
