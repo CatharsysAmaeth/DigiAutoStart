@@ -263,6 +263,34 @@ jobs:
           VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
           VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
           APK_SHA256="$(sha256sum "$APK_DEBUG" | awk '{print $1}')"
+
+          # Keep every validated Debug build in the private diagnostics repository.
+          ARCHIVE_ID="run$GITHUB_RUN_ID"
+          ARCHIVE_APK="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.apk"
+          ARCHIVE_META="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.json"
+          base64 -w 0 "$APK_DEBUG" > /tmp/debug-archive-apk.base64
+          jq --rawfile content /tmp/debug-archive-apk.base64 -n \
+            --arg message "archive: Debug $VERSION_NAME ($VERSION_CODE) $ARCHIVE_ID" \
+            --arg branch "main" \
+            '{message:$message,content:$content,branch:$branch}' |
+            gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$ARCHIVE_APK" --input - >/dev/null
+          jq -n \
+            --arg versionName "$VERSION_NAME" \
+            --arg versionCode "$VERSION_CODE" \
+            --arg sha256 "$APK_SHA256" \
+            --arg sourceCommit "$GITHUB_SHA" \
+            --arg sourceRef "$GITHUB_REF" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg apk "$ARCHIVE_APK" \
+            '{versionName:$versionName,versionCode:($versionCode|tonumber),sha256:$sha256,sourceCommit:$sourceCommit,sourceRef:$sourceRef,runId:$runId,runAttempt:$runAttempt,apk:$apk}' > /tmp/debug-archive-meta.json
+          base64 -w 0 /tmp/debug-archive-meta.json > /tmp/debug-archive-meta.base64
+          jq --rawfile content /tmp/debug-archive-meta.base64 -n \
+            --arg message "archive metadata: Debug $VERSION_NAME ($VERSION_CODE) $ARCHIVE_ID" \
+            --arg branch "main" \
+            '{message:$message,content:$content,branch:$branch}' |
+            gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$ARCHIVE_META" --input - >/dev/null
+
           jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
             '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-debug.apk"}' > /tmp/debug-version.json
           base64 -w 0 /tmp/debug-version.json > /tmp/debug-version.base64
