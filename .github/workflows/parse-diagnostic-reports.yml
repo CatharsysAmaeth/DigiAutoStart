@@ -38,4 +38,4 @@ jobs:
           fi
           python3 tools/parse_private_diagnostic_report.py
 
-# Re-run parser after receipt of the 2026-11-27 20:10:57 private diagnostic report.
+# Re-run parser after receipt of the 2026-11-27 23:30:10 private 0.6.19 diagnostic report.
