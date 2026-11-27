@@ -1,231 +1,180 @@
 package pt.catharsys.digiautostart
 
+import android.content.Context
 import org.jf.dexlib2.DexFileFactory
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.iface.instruction.NarrowLiteralInstruction
-import org.jf.dexlib2.iface.instruction.OneRegisterInstruction
-import org.jf.dexlib2.iface.instruction.TwoRegisterInstruction
-import org.jf.dexlib2.iface.instruction.ThreeRegisterInstruction
-import org.jf.dexlib2.iface.instruction.FiveRegisterInstruction
-import org.jf.dexlib2.iface.instruction.RegisterRangeInstruction
-import org.jf.dexlib2.iface.instruction.SwitchPayload
 import org.jf.dexlib2.iface.instruction.OffsetInstruction
 import org.jf.dexlib2.iface.instruction.ReferenceInstruction
+import org.jf.dexlib2.iface.instruction.SwitchPayload
 import org.jf.dexlib2.iface.instruction.WideLiteralInstruction
 import org.jf.dexlib2.iface.reference.FieldReference
 import org.jf.dexlib2.iface.reference.MethodReference
 import org.jf.dexlib2.iface.reference.StringReference
 import org.jf.dexlib2.iface.reference.TypeReference
 import org.jf.dexlib2.iface.value.IntEncodedValue
-import android.content.Context
 import java.io.File
 
-/** Debug-only, read-only disassembly of selected TvSettings methods. */
+/**
+ * Debug-only, read-only summary of the ZTE TvSettings AIDL contract.
+ * Never binds to or invokes an OEM service.
+ */
 internal object StaticDexProbe {
-    // The accessibility flavor gate is already conclusively mapped. Keep this probe
-    // narrowly scoped so the ZTE gateway AIDL contract cannot be truncated by unrelated classes.
-    private val classTargets = listOf(
-        "/TvSettingsService",
-        "/SettingsInterfaceImp",
-        "/IHgagentService"
+    private const val MAX_OUTPUT_LINES = 240
+    private val classTargets = listOf("TvSettingsService", "SettingsInterfaceImp", "IHgagentService")
+    private val securityNames = Regex(
+        "(?i)(getCallingUid|getCallingPid|getCallingUserHandle|getCallingWorkSourceUid|myUid|" +
+            "checkCallingPermission|checkCallingOrSelfPermission|enforceCallingPermission|" +
+            "enforceCallingOrSelfPermission|checkPermission|enforcePermission|checkSignatures|" +
+            "getPackageName|isSystemApp|hasSystemFeature|transact|onBind|onTransact|asInterface|" +
+            "asBinder|getInterfaceDescriptor|getTransactionName|getDefaultTransactionName|" +
+            "attachInterface|queryLocalInterface|enforceInterface|enforceNoDataAvail|writeToParcel|" +
+            "readException|writeInterfaceToken)"
     )
-    private val methodTargets = Regex(
-        "(?i)(onCreate|createSettingsFragment|getAvailableFlavors|getFlavor|getFeatureFactory|" +
-            "getSettingsFragmentProvider|newSettingsFragment|prepareArgs|isTwoPanel|onCreatePreferences|" +
-            "onPreferenceTreeClick|onResume|setAccessibilityServiceState|finish|isStartupVerificationRequired|" +
-            "onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact|asBinder|asInterface|" +
-            "getInterfaceDescriptor|getTransactionName|getDefaultTransactionName|attachInterface|" +
-            "queryLocalInterface|enforceInterface|enforceNoDataAvail|writeTransactionToParcel)"
+    private val securityStrings = Regex(
+        "(?i)(permission|calling.?uid|calling.?pid|package.?name|not.?allowed|denied|security|caller|descriptor|transaction|gateway|wifi)"
     )
 
+    @Suppress("UNUSED_PARAMETER")
     fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File, context: Context) {
+        val startSize = output.size
         val temp = File.createTempFile("dada-tvsettings-", ".dex", cacheDir)
         try {
             temp.writeBytes(bytes)
             val dex = DexFileFactory.loadDexFile(temp, Opcodes.getDefault())
-            val selected = dex.classes.filter { clazz ->
-                classTargets.any { clazz.type.contains(it, ignoreCase = true) }
-            }.sortedBy { clazz ->
-                when {
-                    clazz.type.contains("TvSettingsService", true) -> 0
-                    clazz.type.contains("IHgagentService", true) && (
-                        clazz.type.contains("\$Stub", true) || clazz.type.contains("\$Proxy", true)
-                    ) -> 1
-                    clazz.type.contains("IHgagentService", true) -> 2
-                    clazz.type.contains("SettingsInterfaceImp", true) -> 3
-                    else -> 4
+            val selected = dex.classes
+                .filter { clazz ->
+                    classTargets.any { clazz.type.contains(it, ignoreCase = true) } &&
+                        !clazz.type.contains("ExternalSyntheticLambda", ignoreCase = true)
                 }
-            }
-            output += "dexDisassembly=$entryName;selectedClasses=${selected.size}"
-            val settingsResources = runCatching {
-                context.packageManager.getResourcesForApplication("com.android.tv.settings")
-            }.getOrNull()
-            val queriedResources = linkedSetOf<String>()
+                .sortedWith(compareBy({ classPriority(it.type) }, { it.type }))
+
+            output += "dexContract=$entryName;selectedClasses=${selected.size};mode=static-read-only"
             for (clazz in selected) {
-                if (output.size >= 700) break
-                val binderClass = clazz.type.contains("TvSettingsService", true) ||
-                    clazz.type.contains("/aidl/", true) ||
-                    clazz.type.contains("\$Stub", true) ||
-                    clazz.type.contains("\$Proxy", true)
-                output += "dexClass=${clazz.type};super=${clazz.superclass ?: "none"}"
-                if (binderClass) {
-                    output += "dexBinderClass=${clazz.type};interfaces=${clazz.interfaces.joinToString(",")};accessFlags=${clazz.accessFlags}"
-                }
-                clazz.fields.filter {
-                    binderClass || it.name.contains("FLAVOR", true) || it.name.contains("MASK", true) ||
-                        it.name.contains("DESCRIPTOR", true) || it.name.contains("TRANSACTION", true)
-                }
+                if (output.size - startSize >= MAX_OUTPUT_LINES) break
+                val type = clazz.type
+                val isService = type.endsWith("/TvSettingsService;")
+                val isSettingsImpl = type.contains("SettingsInterfaceImp", true)
+                val isAidl = type.contains("IHgagentService", true)
+                val isStub = type.contains("\$Stub", true)
+                val isProxy = type.contains("\$Proxy", true)
+
+                output += "dexContractClass=$type;super=${clazz.superclass ?: "none"};interfaces=${clazz.interfaces.joinToString(",")};flags=${clazz.accessFlags}"
+                clazz.fields
+                    .filter { isService || isAidl || it.name.contains("DESCRIPTOR", true) || it.name.contains("TRANSACTION", true) }
                     .forEach { field ->
-                        val encoded = field.initialValue
-                        val value = when (encoded) {
-                            is IntEncodedValue -> encoded.value.toString()
-                            null -> "unset"
-                            else -> encoded.toString()
-                        }
-                        output += "dexStaticField=${clazz.type}->${field.name}:${field.type}=$value"
-                    }
-                val methods = clazz.methods.filter { binderClass || methodTargets.containsMatchIn(it.name) }
-                    .sortedBy { method ->
-                        when (method.name) {
-                            "onCreate" -> 0
-                            "finish" -> 1
-                            "getFlavor" -> 2
-                            "createSettingsFragment" -> 3
-                            "getAvailableFlavors" -> 4
-                            "getFeatureFactory" -> 5
-                            "getSettingsFragmentProvider" -> 6
-                            "onCreatePreferences" -> 7
-                            "onPreferenceTreeClick" -> 8
-                            "onResume" -> 9
-                            else -> 10
+                        if (output.size - startSize < MAX_OUTPUT_LINES) {
+                            val value = when (val encoded = field.initialValue) {
+                                is IntEncodedValue -> encoded.value.toString()
+                                null -> "unset"
+                                else -> encoded.toString()
+                            }
+                            output += "dexContractField=${field.name}:${field.type}=$value"
                         }
                     }
+
+                val methods = clazz.methods.sortedWith(compareBy(
+                    { methodPriority(it.name, isStub, isProxy) },
+                    { it.name },
+                    { it.parameterTypes.joinToString(",") }
+                ))
                 for (method in methods) {
-                    if (output.size >= 420) break
+                    if (output.size - startSize >= MAX_OUTPUT_LINES) break
+                    val signature = method.parameterTypes.joinToString(",") { it.toString() }
+                    val methodId = "$type->${method.name}($signature)${method.returnType}"
                     val impl = method.implementation
-                    if (impl == null) {
-                        if (binderClass) output += "dexBinderMethod=${clazz.type}->${method.name};params=${method.parameterTypes.joinToString(",")};return=${method.returnType};nativeOrAbstract=true"
-                        continue
-                    }
-                    val signature = method.parameterTypes.joinToString("") { it.toString() }
+                    output += "dexContractMethod=$methodId;implemented=${impl != null};instructions=${impl?.instructions?.size ?: 0}"
+                    if (impl == null) continue
+
                     val instructions = impl.instructions.toList()
-                    output += (if (binderClass) "dexBinderMethod=" else "dexMethod=") +
-                        "${clazz.type}->${method.name}($signature)${method.returnType};ins=${instructions.size}"
+                    val detailed = isService || isStub || isProxy
                     var emitted = 0
-                    val fullFlavorMethod = clazz.type.contains("FlavorUtils") && method.name == "getFlavor"
-                    val maxInstructions = when {
-                        binderClass -> 96
-                        fullFlavorMethod -> 220
-                        clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory" -> 100
-                        method.name in setOf(
-                            "onCreate", "finish", "createSettingsFragment",
-                            "getAvailableFlavors", "onCreatePreferences", "isTwoPanel"
-                        ) -> 24
-                        else -> 10
+                    val maxDetails = when {
+                        method.name == "onTransact" -> 64
+                        isProxy -> 18
+                        isService -> 28
+                        else -> 12
                     }
                     for ((index, instruction) in instructions.withIndex()) {
-                        if (emitted >= maxInstructions || output.size >= 420) break
+                        if (emitted >= maxDetails || output.size - startSize >= MAX_OUTPUT_LINES) break
                         val ref = (instruction as? ReferenceInstruction)?.reference
-                        if (ref is FieldReference && settingsResources != null) {
-                            val resourceType = when {
-                                ref.definingClass.endsWith("R\$integer;") -> "integer"
-                                ref.definingClass.endsWith("R\$string;") -> "string"
-                                ref.definingClass.endsWith("R\$bool;") -> "bool"
-                                else -> null
-                            }
-                            if (resourceType != null) {
-                                val key = "$resourceType/" + ref.name
-                                if (queriedResources.add(key)) {
-                                    val id = settingsResources.getIdentifier(ref.name, resourceType, "com.android.tv.settings")
-                                    if (id != 0) {
-                                        val value = runCatching {
-                                            when (resourceType) {
-                                                "integer" -> settingsResources.getInteger(id).toString()
-                                                "string" -> settingsResources.getString(id).take(180)
-                                                else -> settingsResources.getBoolean(id).toString()
-                                            }
-                                        }.getOrElse { "read-error:${it.javaClass.simpleName}" }
-                                        output += "tvSettingsResource=$key;id=$id;value=$value"
-                                    } else {
-                                        output += "tvSettingsResource=$key;not-found"
-                                    }
-                                }
-                            }
-                        }
                         val refText = when (ref) {
-                            is StringReference -> " str=${ref.string.take(160)}"
-                            is MethodReference -> " method=${ref.definingClass}->${ref.name}(" +
-                                ref.parameterTypes.joinToString("") { it.toString() } + ")${ref.returnType}"
-                            is TypeReference -> " type=${ref.type}"
-                            is FieldReference -> " field=${ref.definingClass}->${ref.name}:${ref.type}"
+                            is StringReference -> "str=${ref.string.take(100)}"
+                            is MethodReference -> "call=${ref.definingClass}->${ref.name}(${ref.parameterTypes.joinToString("")})${ref.returnType}"
+                            is TypeReference -> "type=${ref.type}"
+                            is FieldReference -> "field=${ref.definingClass}->${ref.name}:${ref.type}"
                             else -> ""
                         }
-                        val lower = refText.lowercase()
-                        val opcode = instruction.opcode.name.lowercase()
-                        if (fullFlavorMethod && instruction is NarrowLiteralInstruction && settingsResources != null) {
-                            val resourceId = instruction.narrowLiteral
-                            val resourceName = runCatching { settingsResources.getResourceName(resourceId) }.getOrNull()
-                            if (resourceName != null) {
-                                val resourceType = runCatching { settingsResources.getResourceTypeName(resourceId) }.getOrNull()
-                                val resourceValue = runCatching {
-                                    when (resourceType) {
-                                        "string" -> settingsResources.getString(resourceId).take(240)
-                                        "integer" -> settingsResources.getInteger(resourceId).toString()
-                                        "bool" -> settingsResources.getBoolean(resourceId).toString()
-                                        else -> "(type=$resourceType)"
+                        val securityRef = ref is MethodReference && securityNames.containsMatchIn(ref.name)
+                        val securityText = ref is StringReference && securityStrings.containsMatchIn(ref.string)
+                        val transactionData = (isStub || isProxy) && (
+                            instruction is NarrowLiteralInstruction ||
+                                instruction is WideLiteralInstruction ||
+                                ref is StringReference ||
+                                ref is MethodReference ||
+                                ref is FieldReference ||
+                                instruction is SwitchPayload
+                            )
+                        val serviceData = isService && (
+                            securityRef || securityText ||
+                                (ref is MethodReference && ref.definingClass.contains("IHgagentService")) ||
+                                (ref is StringReference && securityStrings.containsMatchIn(ref.string)) ||
+                                method.name in setOf("onBind", "onStartCommand", "getWifiInfo")
+                            )
+                        val implementationSecurity = isSettingsImpl && (securityRef || securityText ||
+                            (ref is MethodReference && ref.definingClass.contains("IHgagentService")))
+
+                        if (detailed && (transactionData || serviceData || securityRef || securityText) ||
+                            implementationSecurity
+                        ) {
+                            val operands = buildString {
+                                if (instruction is NarrowLiteralInstruction) {
+                                    append(" literal=${instruction.narrowLiteral}")
+                                    if (instruction.narrowLiteral > 99_999_999 || instruction.narrowLiteral < -99_999_999) {
+                                        append(" hex=0x${Integer.toHexString(instruction.narrowLiteral)}")
                                     }
-                                }.getOrElse { "read-error:" + it.javaClass.simpleName }
-                                output += "tvSettingsLiteralResource=id=0x" + java.lang.Integer.toHexString(resourceId) + ";name=$resourceName;value=$resourceValue"
-                            }
-                        }
-                        val operands = buildString {
-                            if (fullFlavorMethod) {
-                                when (instruction) {
-                                    is FiveRegisterInstruction -> append(" regs=v${instruction.registerC},v${instruction.registerD},v${instruction.registerE},v${instruction.registerF},v${instruction.registerG}")
-                                    is ThreeRegisterInstruction -> append(" regs=v${instruction.registerA},v${instruction.registerB},v${instruction.registerC}")
-                                    is TwoRegisterInstruction -> append(" regs=v${instruction.registerA},v${instruction.registerB}")
-                                    is OneRegisterInstruction -> append(" regs=v${instruction.registerA}")
-                                    is RegisterRangeInstruction -> append(" regs=v${instruction.startRegister}..v${instruction.startRegister + instruction.registerCount - 1}")
                                 }
+                                if (instruction is WideLiteralInstruction) append(" wide=${instruction.wideLiteral}")
+                                if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
                                 if (instruction is SwitchPayload) {
                                     append(" switch=")
                                     append(instruction.switchElements.joinToString(",") { "${it.key}:${it.offset}" })
                                 }
                             }
-                            if (instruction is NarrowLiteralInstruction) {
-                                val literal = instruction.narrowLiteral
-                                if (literal > 99_999_999 || literal < -99_999_999) {
-                                    append(" literalHex=0x" + java.lang.Integer.toHexString(literal))
-                                } else {
-                                    append(" literal=$literal")
-                                }
-                            }
-                            if (instruction is WideLiteralInstruction) append(" literal=${instruction.wideLiteral}")
-                            if (instruction is OffsetInstruction) append(" offset=${instruction.codeOffset}")
-                        }
-                        val relevant = binderClass || fullFlavorMethod || (clazz.type.contains("FlavorUtils") && method.name == "getFeatureFactory") ||
-                            ref is MethodReference || ref is FieldReference ||
-                            (ref is StringReference && (
-                                lower.contains("accessibility") || lower.contains("flavor") ||
-                                    lower.contains("unsupported") || lower.contains("service")
-                            )) ||
-                            (ref is TypeReference && (
-                                lower.contains("accessibility") || lower.contains("fragment") ||
-                                    lower.contains("factory") || lower.contains("service")
-                            )) ||
-                            opcode.startsWith("const") || opcode.startsWith("if-") || opcode.startsWith("goto") ||
-                            opcode.startsWith("return") || opcode.startsWith("throw")
-                        if (relevant) {
-                            output += "dexInsn=$index:${instruction.opcode.name}$refText$operands"
+                            output += "dexContractInsn=${method.name}#$index:${instruction.opcode.name};$refText$operands"
                             emitted++
                         }
                     }
                 }
             }
         } catch (error: Throwable) {
-            output += "dexDisassemblyError=$entryName;${error.javaClass.simpleName}:${error.message.orEmpty().take(180)}"
+            output += "dexContractError=$entryName;${error.javaClass.simpleName}:${error.message.orEmpty().take(180)}"
         } finally {
             temp.delete()
         }
+    }
+
+    private fun classPriority(type: String): Int = when {
+        type.endsWith("/TvSettingsService;") -> 0
+        type.contains("SettingsInterfaceImp", true) -> 1
+        type.contains("IHgagentService") && type.contains("\$Stub", true) -> 2
+        type.contains("IHgagentService") && type.contains("\$Proxy", true) -> 3
+        type.endsWith("/IHgagentService;") -> 4
+        type.contains("TvSettingsService$1") -> 5
+        else -> 6
+    }
+
+    private fun methodPriority(name: String, isStub: Boolean, isProxy: Boolean): Int = when {
+        name == "onBind" -> 0
+        name == "onStartCommand" -> 1
+        name == "onTransact" -> 2
+        name == "asInterface" -> 3
+        name == "asBinder" -> 4
+        name == "getDefaultTransactionName" -> 5
+        name == "getTransactionName" -> 6
+        name == "getWifiInfo" -> 7
+        isStub && name == "getMaxTransactionId" -> 8
+        isProxy -> 9
+        else -> 10
     }
 }
