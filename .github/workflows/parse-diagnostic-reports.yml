@@ -1,0 +1,38 @@
+name: Parse private DAdA diagnostic report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/parse-diagnostic-reports.yml"
+      - "tools/parse_private_diagnostic_report.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parse-private-dada-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  parse-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out public workflow code
+        uses: actions/checkout@v7
+
+      - name: Fetch, validate, redact and save report privately
+        env:
+          GH_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
+          DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
+          DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DADA_PRIVATE_TOKEN:-}" ] || [ -z "${DADA_PRIVATE_REPOSITORY:-}" ]; then
+            echo "::error::Private diagnostics credentials are not configured."
+            exit 1
+          fi
+          python3 tools/parse_private_diagnostic_report.py
