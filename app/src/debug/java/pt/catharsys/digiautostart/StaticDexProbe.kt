@@ -30,8 +30,8 @@ internal object StaticDexProbe {
             "onPreferenceTreeClick|onResume|setAccessibilityServiceState|isTwoPanel|onKey|intercept|dispatchKey|handleKey|bindService|onBind|onTransact)"
     )
 
-    fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>) {
-        val temp = File.createTempFile("dada-tvsettings-", ".dex")
+    fun inspect(bytes: ByteArray, entryName: String, output: MutableList<String>, cacheDir: File) {
+        val temp = File.createTempFile("dada-tvsettings-", ".dex", cacheDir)
         try {
             temp.writeBytes(bytes)
             val dex = DexFileFactory.loadDexFile(temp, Opcodes.getDefault())
