@@ -163,7 +163,7 @@ object DevicePackageMap {
             settingsScanLines += "TvSettings package unavailable for DEX scan."
         } else {
             val settingsApks = (listOfNotNull(tvSettingsInfo.sourceDir) + tvSettingsInfo.splitSourceDirs.orEmpty()).distinct()
-            for (path in settingsApks) scanSettingsDex(path, settingsScanLines)
+            for (path in settingsApks) scanSettingsDex(path, settingsScanLines, activity.cacheDir)
         }
 
         // Resolve scheme and exact URI candidates using PackageManager only; never launch them.
@@ -215,7 +215,7 @@ object DevicePackageMap {
      * Extracts only bounded, relevant strings from classes*.dex in TvSettings.
      * DEX string_ids point to string_data_item records; no class is loaded or executed.
      */
-    private fun scanSettingsDex(path: String, output: MutableList<String>) {
+    private fun scanSettingsDex(path: String, output: MutableList<String>, cacheDir: File) {
         try {
             ZipFile(File(path)).use { zip ->
                 val entries = zip.entries().asSequence()
@@ -233,7 +233,7 @@ object DevicePackageMap {
                     val bytes = zip.getInputStream(entry).use { it.readBytes() }
                     totalBytes += bytes.size
                     val strings = readDexStringPool(bytes)
-                    StaticDexProbe.inspect(bytes, entry.name, output)
+                    StaticDexProbe.inspect(bytes, entry.name, output, cacheDir)
                     val target = Regex(
                         "(?i)(A11yServiceOemLink|accessibilityServiceInfo|X_EXPERIENCE|FlavorUtils|" +
                             "FeatureFactory|SettingsFragmentProvider|AccessibilityServiceFragment|" +
