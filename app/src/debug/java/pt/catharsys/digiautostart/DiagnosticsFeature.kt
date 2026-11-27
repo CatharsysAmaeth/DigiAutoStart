@@ -28,6 +28,8 @@ import java.util.zip.ZipOutputStream
 object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
+    private const val MAX_EVIDENCE_BYTES = 32L * 1024L * 1024L
+    private const val MAX_ARCHIVE_BYTES = 48L * 1024L * 1024L
 
     private var receiver: BroadcastReceiver? = null
 
@@ -128,6 +130,15 @@ object DiagnosticsFeature {
             val message = try {
                 val exportDir = File(activity.cacheDir, "diagnostics").apply { mkdirs() }
                 val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                val evidenceRoot = File(activity.filesDir, "diagnostics/evidence")
+                val evidenceFiles = if (evidenceRoot.isDirectory) {
+                    evidenceRoot.walkTopDown().filter { it.isFile }.sortedBy { it.absolutePath }.toList()
+                } else emptyList()
+                val evidenceBytes = evidenceFiles.sumOf { it.length() }
+                if (evidenceBytes > MAX_EVIDENCE_BYTES) {
+                    error("A evidência excede o limite seguro de 32 MiB; não foi enviada.")
+                }
+
                 val metadata = File(exportDir, "device-summary.txt")
                 metadata.writeText(
                     "DigiAutoStart diagnostics\n" +
@@ -144,6 +155,8 @@ object DiagnosticsFeature {
                         "security_patch=${Build.VERSION.SECURITY_PATCH}\n" +
                         "supported_abis=${Build.SUPPORTED_ABIS.joinToString(",")}\n" +
                         "target_package=${TargetAppResolver.selectedPackage(activity) ?: "not_detected"}\n" +
+                        "evidence_files=${evidenceFiles.size}\n" +
+                        "evidence_bytes=$evidenceBytes\n" +
                         "screen_broadcasts_are_observations_not_proof_of_standby_or_wake\n"
                 )
 
@@ -155,6 +168,10 @@ object DiagnosticsFeature {
                         addZipEntry(output, "events.previous.jsonl", redact(previous.readText()))
                     }
                     addZipEntry(output, "device-summary.txt", redact(metadata.readText()))
+                    addEvidenceEntries(output, evidenceRoot, evidenceFiles)
+                }
+                if (zip.length() > MAX_ARCHIVE_BYTES) {
+                    error("O relatório excede 48 MiB; não foi enviado.")
                 }
 
                 val encoded = Base64.encodeToString(zip.readBytes(), Base64.NO_WRAP)
@@ -179,6 +196,20 @@ object DiagnosticsFeature {
         output.putNextEntry(ZipEntry(name))
         output.write(content.toByteArray(Charsets.UTF_8))
         output.closeEntry()
+    }
+
+    private fun addEvidenceEntries(output: ZipOutputStream, root: File, files: List<File>) {
+        if (files.isEmpty()) return
+        var total = 0L
+        for (file in files) {
+            total += file.length()
+            if (total > MAX_EVIDENCE_BYTES) error("A evidência excede o limite seguro.")
+            val relative = file.relativeTo(root).invariantSeparatorsPath
+            if (relative.split('/').any { it == ".." }) error("Caminho de evidência inválido.")
+            output.putNextEntry(ZipEntry("evidence/$relative"))
+            file.inputStream().use { input -> input.copyTo(output) }
+            output.closeEntry()
+        }
     }
 
     /** Remove common credential, account-contact and phone-number patterns before export. */
