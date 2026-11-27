@@ -31,9 +31,12 @@ def gh_api(endpoint, *, output=None):
 
 for build in HISTORICAL_BUILDS:
     ref = build["ref"]
-    metadata = json.loads(gh_api(
+    version_file = json.loads(gh_api(
         f"repos/{PRIVATE_REPO}/contents/apk/version.json?ref={ref}"
     ))
+    metadata = json.loads(base64.b64decode(
+        "".join(version_file["content"].split()), validate=True
+    ).decode("utf-8"))
     if metadata.get("versionName") != build["versionName"] or int(metadata.get("versionCode", -1)) != build["versionCode"]:
         raise SystemExit(f"Historical metadata mismatch at {ref}; refusing to archive.")
     expected_sha = metadata.get("sha256", "")
