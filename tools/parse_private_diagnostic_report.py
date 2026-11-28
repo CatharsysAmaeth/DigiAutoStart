@@ -112,16 +112,19 @@ def run_jadx(dex_files, report_stem):
     for group, dex_path in dex_files:
         out_dir = WORK / f"{report_stem}-jadx-{group}-{pathlib.Path(dex_path).stem}"
         result = subprocess.run(
-            [jadx, "--no-res", "-d", str(out_dir), str(dex_path)],
-            stdout=subprocess.DEVNULL,
+            [jadx, "--no-res", "--show-bad-code", "-d", str(out_dir), str(dex_path)],
+            stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=360,
         )
         status.append(f"jadx_{group}=exit_{result.returncode}")
         if result.returncode != 0:
-            detail = (result.stderr or b"").decode("utf-8", errors="replace")[-3000:]
+            detail = (
+                "STDOUT:\\n" + (result.stdout or b"").decode("utf-8", errors="replace")
+                + "\\nSTDERR:\\n" + (result.stderr or b"").decode("utf-8", errors="replace")
+            )[-12000:]
             put_private_file(
-                f"reports/analysis/{report_stem}-jadx-{group}-stderr.txt",
+                f"reports/analysis/{report_stem}-jadx-{group}-diagnostics.txt",
                 detail.encode(),
                 f"analysis: JADX diagnostics for {report_stem} {group}",
             )
@@ -183,11 +186,12 @@ def run_hermes(bundle_path, report_stem):
     env = os.environ.copy()
     env["PATH"] = str(venv / "bin") + os.pathsep + env.get("PATH", "")
     commands = [
-        ("hbc-file-parser", [str(bundle_path)], output_dir / "header.txt", True),
-        ("hbc-disassembler", [str(bundle_path), str(output_dir / "bundle.hasm")], output_dir / "disassembler.stdout.txt", False),
-        ("hbc-decompiler", [str(bundle_path), str(output_dir / "bundle.js")], output_dir / "decompiler.stdout.txt", False),
+        ("hbc-file-parser", [str(bundle_path)], output_dir / "header.txt"),
+        # With no output-file argument both tools write their full result to stdout.
+        ("hbc-disassembler", [str(bundle_path)], output_dir / "bundle.hasm"),
+        ("hbc-decompiler", [str(bundle_path)], output_dir / "bundle.js"),
     ]
-    for command, args, output_path, capture_stdout in commands:
+    for command, args, output_path in commands:
         executable = shutil.which(command, path=env["PATH"])
         if not executable:
             status.append(f"{command}=not_found")
@@ -196,7 +200,7 @@ def run_hermes(bundle_path, report_stem):
             with output_path.open("wb") as stdout_file:
                 result = subprocess.run(
                     [executable] + args,
-                    stdout=stdout_file if capture_stdout else subprocess.DEVNULL,
+                    stdout=stdout_file,
                     stderr=subprocess.PIPE,
                     env=env,
                     timeout=240,
