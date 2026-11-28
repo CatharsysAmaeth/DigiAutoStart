@@ -43,7 +43,7 @@ def put_private_file(path, data, message):
     try:
         existing = json.loads(gh_api(endpoint + "?ref=main"))
         if existing.get("sha"):
-            blob_header = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+            blob_header = b"blob " + str(len(data)).encode("ascii") + b"\0"
             expected_sha = hashlib.sha1(blob_header + data).hexdigest()
             if existing["sha"] == expected_sha:
                 return
@@ -111,7 +111,7 @@ def run_jadx(dex_files, report_stem):
     selected = {"digi": [], "zte-tv-settings": []}
     patterns = {
         "digi": re.compile(r"(?i)(MainActivity|MainApplication|ReactActivity|sendIntentAndroid|Linking|channel|livestream|player|Intent\.ACTION_VIEW)"),
-        "zte-tv-settings": re.compile(r"(?i)(AccessibilityServiceActivity|AccessibilitySettingsActivity|AccessibilityServiceFragment|AccessibilitySettingsFragment|FlavorUtils|X_EXPERIENCE_FLAVORS_MASK|FeatureFactory|SettingsFragmentProvider|ACCESSIBILITY_SETTINGS|A11yServiceOemLink|TvSettingsActivity)"),
+        "zte-tv-settings": re.compile(r"(?i)(AccessibilityServiceActivity|AccessibilitySettingsActivity|AccessibilityServiceFragment|AccessibilitySettingsFragment|AccessibilityServiceConfirmationFragment|AccessibilityFragment|FlavorUtils|X_EXPERIENCE_FLAVORS_MASK|FeatureFactory|SettingsFragmentProvider|ACCESSIBILITY_SETTINGS|A11yServiceOemLink|TvSettingsActivity|TvSettingsService|SettingsInterfaceImp|IHgagentService|TotalServer|AccessibilityCode|Gateway)"),
     }
     for group, dex_path in dex_files:
         out_dir = WORK / f"{report_stem}-jadx-{group}-{pathlib.Path(dex_path).stem}"
