@@ -43,6 +43,10 @@ def put_private_file(path, data, message):
     try:
         existing = json.loads(gh_api(endpoint + "?ref=main"))
         if existing.get("sha"):
+            blob_header = b"blob " + str(len(data)).encode("ascii") + b"\\0"
+            expected_sha = hashlib.sha1(blob_header + data).hexdigest()
+            if existing["sha"] == expected_sha:
+                return
             body["sha"] = existing["sha"]
     except subprocess.CalledProcessError:
         pass
@@ -128,7 +132,8 @@ def run_jadx(dex_files, report_stem):
                 detail.encode(),
                 f"analysis: JADX diagnostics for {report_stem} {group}",
             )
-            continue
+        # JADX can return exit code 3 after partially decompiling classes.
+        # Keep collecting the source files it successfully wrote.
         for source_path in sorted(out_dir.rglob("*.java")):
             try:
                 source = source_path.read_text(encoding="utf-8", errors="replace")
