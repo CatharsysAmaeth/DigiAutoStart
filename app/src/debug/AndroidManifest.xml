@@ -8,7 +8,59 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <queries>
+        <package android:name="com.android.tv.settings" />
+        <package android:name="com.android.settings" />
+        <package android:name="com.google.android.marvin.talkback" />
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SERVICES_TV_OEM_LINK" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_TV_OEM_LINK" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_DETAILS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SHORTCUT_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_MOTION_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_CONTRAST_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.REDUCE_BRIGHT_COLORS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="com.android.settings.ACCESSIBILITY_COLOR_SPACE_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.COLOR_INVERSION_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.TEXT_READING_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.CAPTIONING_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_CAPTION_TV_OEM_LINK" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_COLOR_CORRECTION_TV_OEM_LINK" />
+        </intent>
+    </queries>
+
     <application>
+        <activity
+            android:name=".AccessibilitySetupActivity"
+            android:exported="false" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.diagnostics.files"
@@ -24,12 +76,26 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Maintain a lightweight screen-state listener to reopen DIGI TV after the user wakes the Android TV device." />
         </service>
+        <service
+            android:name=".DigiTvAccessibilityProbeService"
+            android:label="Observador de interface DIGI TV (Debug)"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/digi_tv_probe_accessibility" />
+        </service>
         <receiver
             android:name=".AutomationBootReceiver"
             android:enabled="true"
             android:exported="false">
-            <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
     </application>
 </manifest>

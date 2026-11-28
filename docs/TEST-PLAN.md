@@ -1,10 +1,10 @@
-# DAdA 0.6.0 acceptance test plan
+# DAdA 0.6.6 acceptance and investigation test plan
 
 ## T1 — Installation and upgrade
 
-- Install the normal Release APK.
-- Confirm DAdA appears in the Android TV app list with the correct icon and banner.
-- Confirm an existing signed installation can be updated without uninstalling it.
+- Install the Android 12 Debug update over the existing DAdA Debug app.
+- Confirm the package identity remains `pt.catharsys.digiautostart`.
+- Confirm the Debug version updates without uninstalling the existing app.
 - Confirm saved preferences remain available after the update.
 - Confirm the original launcher and DIGI TV remain functional.
 - Confirm Widevine L1 and platform certification remain intact.
@@ -41,11 +41,64 @@
 - Confirm ambiguous candidates require manual selection.
 - Confirm the selected target is used consistently for standby and startup.
 
-## T6 — Release isolation and privacy
+## T6 — Package and deep-link discovery
 
-- Confirm the normal Release has no Debug menu, diagnostic collection or internal test-update tools.
-- Confirm Release does not request Debug-only internet or package-install permissions.
-- Confirm no device identifiers, credentials, signing material or internal network details are included in public documentation.
+- Start opt-in Diagnostics collection.
+- Open “Investigar DIGI TV (Debug)”.
+- Run “Inspecionar aplicação e deep links” and record the installed DIGI TV version, exported activities and whether `digitv://ia-livestream/1` resolves to an activity.
+- Do not interpret a route string found in the JavaScript bundle as proof that the URI is accepted.
+- If an activity resolves, run the candidate deep-link test once and record the resulting screen.
+- Compare with “Abrir DIGI TV normalmente”.
+- Record whether either route reaches the initial screen, channel 1, an error, or another screen.
+
+## T7 — Accessibility service registration preflight
+
+- Install Debug 0.6.6 over the existing Debug app; do not uninstall.
+- Open the Debug menu and run "Diagnosticar Acessibilidade (Debug)".
+- Record PackageManager component lookup, accessibility-service intent discovery, metadata XML parsing, AccessibilityManager installed/enabled lists, and the secure enabled-services setting.
+- Review the result before opening Android Accessibility settings or asking the user to enable anything.
+- This diagnostic is read-only and must not modify secure settings or enable the service.
+
+## T8 — User-mediated accessibility setup route diagnosis
+
+- Open **Ativar observador DIGI TV (Debug)** from the Debug menu.
+- Read the disclosure and explicitly consent before opening Android settings.
+- Press **Autorizar observador nas Definições Android** once.
+- Do not try to enable another accessibility service.
+- Return to DAdA and press **Actualizar estado**.
+- Upload the opt-in diagnostic report.
+- Review `accessibility_tv_oem_link_preflight` for `resolved` and `candidates`, and `accessibility_tv_oem_link_launch_accepted` for the launch result.
+- Treat the resolved component only as PackageManager's predicted destination; the visual screen still needs to be compared with the device result.
+- Do not enable TalkBack or Switch Access as a workaround.
+
+## T9 — Accessibility observation
+
+- Enable Diagnostics collection in DAdA.
+- Manually enable “Observador de interface DIGI TV (Debug)” only if the service-specific Android confirmation is actually presented.
+- Open DIGI TV normally and wait for the initial screen to settle.
+- Record the initial highlighted “Ver mais” state.
+- Observe whether window-state, content-change, focus and selection events are emitted.
+- Confirm the view-tree summary identifies visible labels, focusable/clickable nodes and bounds.
+- Navigate manually with DOWN, DOWN, OK and record the corresponding focus/selection changes and resulting channel screen.
+- Disable the accessibility observer after the test if no longer needed.
+
+## T10 — Variable startup timing
+
+- With Diagnostics and the accessibility observer enabled, open DIGI TV normally five times.
+- For each run, record the first DIGI TV window event, the first non-empty view-tree snapshot, the initial “Ver mais” highlight and the first observed live-channel/player state.
+- Repeat after returning to DAdA between runs.
+- Do not use a fixed delay as a proxy for readiness; derive timing from observed UI events.
+- Record any run where the accessibility tree is unavailable or incomplete.
+
+## T11 — Release isolation and privacy
+
+- Confirm the normal Release has no Debug menu, diagnostic collection, DIGI TV accessibility observer or internal test-update tools.
+- Confirm Release does not request Debug-only internet, package-install or accessibility-service declarations.
+- Enable the accessibility observer only for the test and only after reading its disclosure.
+- The observer is restricted to package `ro.digionline.tv`; it records bounded visible UI text and node metadata, not screenshots or audio.
+- Password-marked accessibility nodes are recorded as markers rather than text. Email and phone-like strings are redacted, but all reports must still be treated as potentially sensitive.
+- Upload the encrypted report only after explicitly choosing “Criar e enviar relatório”; reports belong only in the private diagnostics repository.
+- Delete local logs after successful review if no longer needed.
 
 ## Evidence rules
 

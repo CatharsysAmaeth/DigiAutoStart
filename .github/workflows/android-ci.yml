@@ -107,14 +107,45 @@ jobs:
         env:
           DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
           DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
-          DADA_DEBUG_REPORT_PASSWORD: ${{ secrets.DADA_DEBUG_REPORT_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
           export DADA_PRIVATE_REPOSITORY_B64="$(printf '%s' "$DADA_PRIVATE_REPOSITORY" | base64 -w 0)"
           export DADA_PRIVATE_TOKEN_B64="$(printf '%s' "$DADA_PRIVATE_TOKEN" | base64 -w 0)"
-          export DADA_DEBUG_REPORT_PASSWORD_B64="$(printf '%s' "$DADA_DEBUG_REPORT_PASSWORD" | base64 -w 0)"
           gradle --no-daemon --stacktrace testAndroid12DebugUnitTest assembleAndroid12Debug assembleAndroid12Release assembleAndroid9Release
+
+      - name: Verify Debug accessibility service is packaged
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/android12/debug/app-android12-debug.apk"
+          test -f "$APK"
+          AAPT="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          MANIFEST="/tmp/android12-debug-manifest.txt"
+          XML="/tmp/digi-tv-probe-accessibility.txt"
+
+          echo "=== APK identity ==="
+          "$AAPT" dump badging "$APK" | head -n 8
+          echo "=== Decoded Debug manifest ==="
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml | tee "$MANIFEST"
+          echo "=== Accessibility configuration ==="
+          "$AAPT" dump xmltree "$APK" res/xml/digi_tv_probe_accessibility.xml | tee "$XML"
+
+          check_contains() {
+            local file="$1"
+            local needle="$2"
+            if ! grep -Fqi "$needle" "$file"; then
+              echo "::error::Missing '$needle' in $file"
+              return 1
+            fi
+          }
+
+          check_contains "$MANIFEST" 'DigiTvAccessibilityProbeService'
+          check_contains "$MANIFEST" 'BIND_ACCESSIBILITY_SERVICE'
+          check_contains "$MANIFEST" 'android.accessibilityservice.AccessibilityService'
+          check_contains "$XML" 'ro.digionline.tv'
+          check_contains "$XML" 'canRetrieveWindowContent'
+          echo "Debug accessibility service and its configuration are present in the APK."
 
       - name: Verify both Release APKs and variant isolation
         shell: bash
@@ -136,7 +167,6 @@ jobs:
 
             if [ "$variant" = android12 ]; then
               grep -Fq 'FOREGROUND_SERVICE_SPECIAL_USE' "$MANIFEST"
-              # aapt renders this enum as its numeric bitmask (0x40000000), not the source token.
               grep -Eqi 'foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"
             else
               if grep -Eq 'FOREGROUND_SERVICE_SPECIAL_USE|PROPERTY_SPECIAL_USE_FGS_SUBTYPE|foregroundServiceType.*(specialUse|0x40000000)' "$MANIFEST"; then
@@ -163,7 +193,7 @@ jobs:
             done < <(unzip -Z1 "$APK" | grep -E '^classes[0-9]*[.]dex$'))"
 
             if printf '%s' "$DEX_STRINGS" | grep -Eq 'net/lingala/zip4j|DADA_PRIVATE_(TOKEN|REPOSITORY)_B64|DADA_DEBUG_REPORT_PASSWORD_B64|Diagnósticos \\(Debug\\)|Verificar atualizações'; then
-              echo "Unexpected internal diagnostic or Debug updater code found in $variant Release APK"
+              echo "Unexpected Debug-only diagnostic or updater code found in $variant Release APK"
               exit 1
             fi
             for marker in wake_should_launch launch_digi_on_boot; do
@@ -233,6 +263,35 @@ jobs:
           VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)$/\1/p' app/build.gradle.kts | head -n1)"
           VERSION_NAME="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"$/\1/p' app/build.gradle.kts | head -n1)"
           APK_SHA256="$(sha256sum "$APK_DEBUG" | awk '{print $1}')"
+          echo "Validated Debug APK SHA-256: $APK_SHA256"
+
+          # Keep every validated Debug build in the private diagnostics repository.
+          ARCHIVE_ID="run$GITHUB_RUN_ID-attempt$GITHUB_RUN_ATTEMPT"
+          ARCHIVE_APK="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.apk"
+          ARCHIVE_META="apk/archive/DigiAutoStart-debug-$VERSION_NAME-$VERSION_CODE-$ARCHIVE_ID.json"
+          base64 -w 0 "$APK_DEBUG" > /tmp/debug-archive-apk.base64
+          jq --rawfile content /tmp/debug-archive-apk.base64 -n \
+            --arg message "archive: Debug $VERSION_NAME ($VERSION_CODE) $ARCHIVE_ID" \
+            --arg branch "main" \
+            '{message:$message,content:$content,branch:$branch}' |
+            gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$ARCHIVE_APK" --input - >/dev/null
+          jq -n \
+            --arg versionName "$VERSION_NAME" \
+            --arg versionCode "$VERSION_CODE" \
+            --arg sha256 "$APK_SHA256" \
+            --arg sourceCommit "$GITHUB_SHA" \
+            --arg sourceRef "$GITHUB_REF" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg apk "$ARCHIVE_APK" \
+            '{versionName:$versionName,versionCode:($versionCode|tonumber),sha256:$sha256,sourceCommit:$sourceCommit,sourceRef:$sourceRef,runId:$runId,runAttempt:$runAttempt,apk:$apk}' > /tmp/debug-archive-meta.json
+          base64 -w 0 /tmp/debug-archive-meta.json > /tmp/debug-archive-meta.base64
+          jq --rawfile content /tmp/debug-archive-meta.base64 -n \
+            --arg message "archive metadata: Debug $VERSION_NAME ($VERSION_CODE) $ARCHIVE_ID" \
+            --arg branch "main" \
+            '{message:$message,content:$content,branch:$branch}' |
+            gh api --method PUT "repos/$PRIVATE_ASSETS_REPOSITORY/contents/$ARCHIVE_META" --input - >/dev/null
+
           jq -n --arg versionName "$VERSION_NAME" --arg versionCode "$VERSION_CODE" --arg sha256 "$APK_SHA256" \
             '{versionCode:($versionCode|tonumber),versionName:$versionName,sha256:$sha256,apk:"apk/DigiAutoStart-debug.apk"}' > /tmp/debug-version.json
           base64 -w 0 /tmp/debug-version.json > /tmp/debug-version.base64

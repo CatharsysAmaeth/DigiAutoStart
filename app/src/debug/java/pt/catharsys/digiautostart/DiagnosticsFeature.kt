@@ -9,28 +9,28 @@ import android.content.IntentFilter
 import android.os.Build
 import android.util.Base64
 import android.widget.Toast
-import net.lingala.zip4j.ZipFile
-import net.lingala.zip4j.model.ZipParameters
-import net.lingala.zip4j.model.enums.AesKeyStrength
-import net.lingala.zip4j.model.enums.CompressionMethod
-import net.lingala.zip4j.model.enums.EncryptionMethod
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /**
- * Debug-only diagnostics. Captures only DigiAutoStart-owned events and the
- * two screen broadcasts observed while the app process is alive.
+ * Debug-only opt-in diagnostics. Reports are ordinary ZIP files uploaded only
+ * after the user explicitly chooses "Criar e enviar relatório".
  */
 object DiagnosticsFeature {
     private const val PREFS = "digi_autostart_diagnostics"
     private const val MAX_LOG_BYTES = 1024L * 1024L
-    
+    private const val MAX_EVIDENCE_BYTES = 32L * 1024L * 1024L
+    private const val MAX_ARCHIVE_BYTES = 48L * 1024L * 1024L
+
     private var receiver: BroadcastReceiver? = null
 
     fun attach(context: Context) {
@@ -64,6 +64,9 @@ object DiagnosticsFeature {
         record(context, "screen_receiver_detached")
     }
 
+    fun isCapturing(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
+
     fun record(context: Context, event: String, details: String = "") {
         if (!isCapturing(context)) return
         val file = logFile(context)
@@ -72,8 +75,9 @@ object DiagnosticsFeature {
             if (previous.exists()) previous.delete()
             file.renameTo(previous)
         }
-        val safeDetails = details.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
-        val line = """{"time":"${isoNow()}","event":"$event","details":"$safeDetails"}""" + "\n"
+        val safeDetails = redact(details).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ")
+        val safeEvent = redact(event).replace("\"", "")
+        val line = """{"time":"${isoNow()}","event":"$safeEvent","details":"$safeDetails"}""" + "\n"
         file.parentFile?.mkdirs()
         file.appendText(line)
     }
@@ -115,18 +119,26 @@ object DiagnosticsFeature {
             return
         }
         val token = secret(BuildConfig.DADA_PRIVATE_TOKEN_B64)
-        val password = secret(BuildConfig.DADA_DEBUG_REPORT_PASSWORD_B64)
         val repository = secret(BuildConfig.DADA_PRIVATE_REPOSITORY_B64)
-        if (token.isBlank() || password.isBlank() || !repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) {
+        if (token.isBlank() || !repository.matches(Regex("[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"))) {
             Toast.makeText(activity, "A configuração do canal interno desta compilação está incompleta.", Toast.LENGTH_LONG).show()
             return
         }
 
-        Toast.makeText(activity, "A criar e enviar relatório encriptado…", Toast.LENGTH_LONG).show()
+        Toast.makeText(activity, "A criar e enviar relatório…", Toast.LENGTH_LONG).show()
         Thread {
             val message = try {
                 val exportDir = File(activity.cacheDir, "diagnostics").apply { mkdirs() }
                 val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                val evidenceRoot = File(activity.filesDir, "diagnostics/evidence")
+                val evidenceFiles = if (evidenceRoot.isDirectory) {
+                    evidenceRoot.walkTopDown().filter { it.isFile }.sortedBy { it.absolutePath }.toList()
+                } else emptyList()
+                val evidenceBytes = evidenceFiles.sumOf { it.length() }
+                if (evidenceBytes > MAX_EVIDENCE_BYTES) {
+                    error("A evidência excede o limite seguro de 32 MiB; não foi enviada.")
+                }
+
                 val metadata = File(exportDir, "device-summary.txt")
                 metadata.writeText(
                     "DigiAutoStart diagnostics\n" +
@@ -134,23 +146,37 @@ object DiagnosticsFeature {
                         "app_version=${BuildConfig.VERSION_NAME}\n" +
                         "android_sdk=${Build.VERSION.SDK_INT}\n" +
                         "android_release=${Build.VERSION.RELEASE}\n" +
-                        "device_model=${Build.MODEL}\n" +
-                        "manufacturer=${Build.MANUFACTURER}\n" +
+                        "device_model=${redact(Build.MODEL)}\n" +
+                        "manufacturer=${redact(Build.MANUFACTURER)}\n" +
+                        "brand=${redact(Build.BRAND)}\n" +
+                        "device=${redact(Build.DEVICE)}\n" +
+                        "product=${redact(Build.PRODUCT)}\n" +
+                        "build_fingerprint=${redact(Build.FINGERPRINT)}\n" +
+                        "security_patch=${Build.VERSION.SECURITY_PATCH}\n" +
+                        "supported_abis=${Build.SUPPORTED_ABIS.joinToString(",")}\n" +
                         "target_package=${TargetAppResolver.selectedPackage(activity) ?: "not_detected"}\n" +
+                        "evidence_files=${evidenceFiles.size}\n" +
+                        "evidence_bytes=$evidenceBytes\n" +
                         "screen_broadcasts_are_observations_not_proof_of_standby_or_wake\n"
                 )
-                val zip = File(exportDir, "DigiAutoStart-$stamp-encrypted.zip")
-                val zipFile = ZipFile(zip, password.toCharArray())
-                zipFile.addFile(source, encryptedParameters("events.jsonl"))
-                val previous = File(source.parentFile, "events.previous.jsonl")
-                if (previous.exists() && previous.length() > 0L) {
-                    zipFile.addFile(previous, encryptedParameters("events.previous.jsonl"))
+
+                val zip = File(exportDir, "DigiAutoStart-$stamp.zip")
+                ZipOutputStream(FileOutputStream(zip)).use { output ->
+                    addZipEntry(output, "events.jsonl", redact(source.readText()))
+                    val previous = File(source.parentFile, "events.previous.jsonl")
+                    if (previous.exists() && previous.length() > 0L) {
+                        addZipEntry(output, "events.previous.jsonl", redact(previous.readText()))
+                    }
+                    addZipEntry(output, "device-summary.txt", redact(metadata.readText()))
+                    addEvidenceEntries(output, evidenceRoot, evidenceFiles)
                 }
-                zipFile.addFile(metadata, encryptedParameters("device-summary.txt"))
+                if (zip.length() > MAX_ARCHIVE_BYTES) {
+                    error("O relatório excede 48 MiB; não foi enviado.")
+                }
 
                 val encoded = Base64.encodeToString(zip.readBytes(), Base64.NO_WRAP)
                 val body = JSONObject()
-                    .put("message", "Add encrypted DigiAutoStart diagnostic report")
+                    .put("message", "Add DigiAutoStart diagnostic report")
                     .put("content", encoded)
                     .toString()
                 val endpoint = "https://api.github.com/repos/$repository/contents/reports/${zip.name}"
@@ -166,12 +192,38 @@ object DiagnosticsFeature {
         }.start()
     }
 
-    private fun encryptedParameters(name: String) = ZipParameters().apply {
-        fileNameInZip = name
-        compressionMethod = CompressionMethod.DEFLATE
-        isEncryptFiles = true
-        encryptionMethod = EncryptionMethod.AES
-        aesKeyStrength = AesKeyStrength.KEY_STRENGTH_256
+    private fun addZipEntry(output: ZipOutputStream, name: String, content: String) {
+        output.putNextEntry(ZipEntry(name))
+        output.write(content.toByteArray(Charsets.UTF_8))
+        output.closeEntry()
+    }
+
+    private fun addEvidenceEntries(output: ZipOutputStream, root: File, files: List<File>) {
+        if (files.isEmpty()) return
+        var total = 0L
+        for (file in files) {
+            total += file.length()
+            if (total > MAX_EVIDENCE_BYTES) error("A evidência excede o limite seguro.")
+            val relative = file.relativeTo(root).invariantSeparatorsPath
+            if (relative.split('/').any { it == ".." }) error("Caminho de evidência inválido.")
+            output.putNextEntry(ZipEntry("evidence/$relative"))
+            file.inputStream().use { input -> input.copyTo(output) }
+            output.closeEntry()
+        }
+    }
+
+    /** Remove common credential, account-contact and phone-number patterns before export. */
+    private fun redact(input: String): String {
+        var value = input
+        value = value.replace(Regex("(?i)(authorization\\s*[:=]\\s*bearer\\s+)[^\\s\\\",]+"), "\$1[REDACTED]")
+        value = value.replace(Regex("(?i)\\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b"), "[REDACTED_TOKEN]")
+        value = value.replace(
+            Regex("(?i)\\b(password|passwd|token|access[_-]?token|refresh[_-]?token|session(?:[_-]?id)?|api[_-]?key|pin|otp)\\s*[:=]\\s*(\"[^\"]*\"|'[^']*'|[^,\\s}]+)"),
+            "\$1=[REDACTED]"
+        )
+        value = value.replace(Regex("(?i)\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b"), "[REDACTED_EMAIL]")
+        value = value.replace(Regex("(?<![A-Za-z0-9])(?:\\+?\\d[\\d .()/-]{7,}\\d)(?![A-Za-z0-9])"), "[REDACTED_PHONE]")
+        return value
     }
 
     private fun secret(encoded: String): String = try {
@@ -202,9 +254,6 @@ object DiagnosticsFeature {
             connection.disconnect()
         }
     }
-
-    private fun isCapturing(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("enabled", false)
 
     private fun logFile(context: Context): File =
         File(context.filesDir, "diagnostics/events.jsonl").apply { parentFile?.mkdirs() }
