@@ -161,6 +161,39 @@ object DeviceAccessibilityInventory {
             add("package_$pkg", info?.versionName ?: "not_visible_or_not_installed")
         }
 
+        // TvSettings' OEM AccessibilityServiceActivity only permits X and Vendor
+        // flavors (mask 12). Read the flavor resource from TvSettings itself;
+        // this is read-only and avoids copying its large resources.arsc table.
+        lines += "=== FLAVOR ELEGÍVEL PARA AUTORIZAÇÃO OEM ==="
+        val tvSettingsContext = runCatching {
+            context.createPackageContext("com.android.tv.settings", 0)
+        }.getOrNull()
+        val tvSettingsFlavor = runCatching {
+            tvSettingsContext?.getString(2131821209)
+        }.getOrNull()
+        val tvSettingsFlavorMask = when (tvSettingsFlavor) {
+            "Classic" -> 1
+            "TwoPanel" -> 2
+            "X" -> 4
+            "Vendor" -> 8
+            else -> null
+        }
+        add("tv_settings_flavor", tvSettingsFlavor ?: "unavailable")
+        add("tv_settings_flavor_mask", tvSettingsFlavorMask ?: "unknown")
+        add(
+            "tv_settings_accessibility_service_activity_flavor_supported",
+            tvSettingsFlavorMask?.let { (it and 12) != 0 } ?: "unknown"
+        )
+        listOf(
+            "com.android.tv.settings.oemlink.AccessibilityServiceActivity",
+            "com.android.tv.settings.oemlink.AccessibilitySettingsActivity"
+        ).forEach { className ->
+            val info = runCatching {
+                pm.getActivityInfo(ComponentName("com.android.tv.settings", className), 0)
+            }.getOrNull()
+            lines += "tv_settings_activity=$className;present=${info != null};exported=${info?.exported};enabled=${info?.enabled};permission=${info?.permission}"
+        }
+
         val report = lines.joinToString("\n")
         DiagnosticsFeature.record(context, "device_accessibility_inventory", report)
         val view = TextView(activity).apply {
