@@ -79,7 +79,7 @@ def scrub(value):
         text = pattern.sub(replacement, text)
     return text
 
-def run_jadx(dex_files, report_stem):
+def run_jadx(dex_files, report_stem, base_apk=None):
     if not dex_files:
         return []
     status = []
@@ -143,6 +143,36 @@ def run_jadx(dex_files, report_stem):
                 continue
             relative = source_path.relative_to(out_dir).as_posix()
             selected[group].append(f"===== {relative} =====\n{source}\n")
+    if base_apk and pathlib.Path(base_apk).is_file():
+        manifest_dir = WORK / f"{report_stem}-jadx-manifest"
+        manifest_result = subprocess.run(
+            [jadx, "--no-src", "-d", str(manifest_dir), str(base_apk)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=240,
+        )
+        status.append(f"jadx_manifest=exit_{manifest_result.returncode}")
+        manifest_candidates = list(manifest_dir.rglob("AndroidManifest.xml"))
+        if manifest_candidates:
+            manifest_data = manifest_candidates[0].read_bytes()
+            put_private_file(
+                f"reports/analysis/{report_stem}-digi-decoded-AndroidManifest.xml",
+                manifest_data,
+                f"analysis: decoded DIGI manifest for {report_stem}",
+            )
+            status.append(f"jadx_manifest_saved={len(manifest_data)}")
+        else:
+            detail = (
+                (manifest_result.stdout or b"").decode("utf-8", errors="replace")
+                + "\\n"
+                + (manifest_result.stderr or b"").decode("utf-8", errors="replace")
+            )[-8000:]
+            put_private_file(
+                f"reports/analysis/{report_stem}-jadx-manifest-diagnostics.txt",
+                detail.encode(),
+                f"analysis: JADX manifest diagnostics for {report_stem}",
+            )
+            status.append("jadx_manifest_not_found")
     for group, sources in selected.items():
         if not sources:
             status.append(f"jadx_{group}_selected=0")
@@ -268,6 +298,7 @@ for archive_name in archive_names:
         bundle_local = None
         dex_local_files = []
         evidence_total = 0
+        base_apk_local = WORK / (stem + "-reconstructed-base.apk")
         evidence_members = sorted(name for name in names if name.startswith("evidence/") and not name.endswith("/"))
         for member in evidence_members:
             relative = pathlib.PurePosixPath(member[len("evidence/"):])
@@ -295,6 +326,17 @@ for archive_name in archive_names:
                 if group in ("digi", "zte-tv-settings"):
                     dex_local_files.append((group, dex_local))
 
+        # Reconstruct a temporary, unsigned base APK from the captured base entries.
+        # This is used only by JADX to decode the binary AndroidManifest.xml.
+        base_prefix = "evidence/digi/base/"
+        base_entries = [name for name in evidence_members if name.startswith(base_prefix)]
+        if base_entries:
+            with zipfile.ZipFile(base_apk_local, "w", compression=zipfile.ZIP_DEFLATED) as apk_zip:
+                for member in base_entries:
+                    apk_name = member[len(base_prefix):]
+                    if apk_name and not any(part in ("", ".", "..") for part in pathlib.PurePosixPath(apk_name).parts):
+                        apk_zip.writestr(apk_name, zf.read(member))
+
     events = []
     for line in payload.get("events.jsonl", "").splitlines():
         if not line.strip():
@@ -307,7 +349,7 @@ for archive_name in archive_names:
     hermes_status = []
     if bundle_local and bundle_local.exists():
         hermes_status = run_hermes(bundle_local, stem)
-    jadx_status = run_jadx(dex_local_files, stem)
+    jadx_status = run_jadx(dex_local_files, stem, base_apk_local if base_apk_local.exists() else None)
 
     out = WORK / (stem + ".md")
     parts = [
