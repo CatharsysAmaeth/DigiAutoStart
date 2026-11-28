@@ -39,3 +39,5 @@ jobs:
           python3 tools/parse_private_diagnostic_report.py
 
 # This run is pinned to the single report received at 2026-11-28 01:09:14 UTC.
+
+# Re-run after the 2026-11-28 report analysis partial write; same private report only.
