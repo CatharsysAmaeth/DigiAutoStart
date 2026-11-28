@@ -1,6 +1,5 @@
 name: Parse private DAdA diagnostic report
-run-name: Parse latest private DAdA report
-
+run-name: Parse private DAdA report 2026-11-28 01:09
 on:
   push:
     branches: [main]
@@ -29,6 +28,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
           DADA_PRIVATE_TOKEN: ${{ secrets.DADA_PRIVATE_TOKEN }}
           DADA_PRIVATE_REPOSITORY: ${{ secrets.DADA_PRIVATE_REPOSITORY }}
+          DADA_REPORT_NAMES: DigiAutoStart-20261128-010901.zip
         shell: bash
         run: |
           set -euo pipefail
@@ -38,4 +38,4 @@ jobs:
           fi
           python3 tools/parse_private_diagnostic_report.py
 
-# Re-run parser after receipt of the 2026-11-27 23:30:10 private 0.6.19 diagnostic report.
+# This run is pinned to the single report received at 2026-11-28 01:09:14 UTC.
